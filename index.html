@@ -1,1 +1,24 @@
-file:///tmp/index_to_push.html
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Журнал диспетчера</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:560px;margin:48px auto;padding:0 20px;line-height:1.5;color:#17262f}
+a{color:#0e6e78}
+code{background:#eef2f4;padding:2px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Журнал диспетчера</h1>
+<p>Полный <code>index.html</code> (~120&nbsp;КБ) не удалось залить через API одним запросом.</p>
+<p>Скачайте файл из проекта Grok (<code>artifacts/index.html</code>) и замените <code>index.html</code> в репозитории вручную:</p>
+<ol>
+<li>Откройте <a href="https://github.com/speed660/scada-log-app">speed660/scada-log-app</a></li>
+<li>Файл <code>index.html</code> → Edit → вставьте содержимое → Commit</li>
+</ol>
+<p>Или через git:</p>
+<pre>git add index.html && git commit -m "Полный index.html" && git push</pre>
+</body>
+</html>
