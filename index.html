@@ -3,22 +3,1839 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
 <title>Журнал диспетчера</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:560px;margin:48px auto;padding:0 20px;line-height:1.5;color:#17262f}
-a{color:#0e6e78}
-code{background:#eef2f4;padding:2px 6px;border-radius:4px}
+:root{
+  --paper:#eef2f4;--panel:#ffffff;--ink:#17262f;--muted:#5d6f7a;--line:#d5dde2;--soft:#e5ebee;
+  --teal:#0e6e78;--teal-ink:#ffffff;--teal-soft:#dbeef0;
+  --sun:#c97f06;--sun-soft:#fbefd9;--sun-ink:#6e4500;
+  --ok:#2f8a57;--danger:#b8402f;
+  --tag-s:55%;--tag-l:91%;--tag-tl:27%;
+  --r-s:6px;--r-m:10px;--r-l:16px;
+  --shadow:0 10px 30px rgba(18,38,48,.14);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#10181c;--panel:#172127;--ink:#e4ecef;--muted:#8fa1ab;--line:#26343b;--soft:#1e2a30;
+  --teal:#36b0ba;--teal-ink:#05282c;--teal-soft:#15343a;
+  --sun:#f2b13a;--sun-soft:#33270f;--sun-ink:#f8d48a;
+  --ok:#5cc58a;--danger:#f07a66;
+  --tag-s:38%;--tag-l:22%;--tag-tl:80%;
+  --shadow:0 10px 30px rgba(0,0,0,.45);
+  color-scheme:dark;
+}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;font-size:15px;line-height:1.5;background:var(--paper);color:var(--ink);min-height:100vh}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+a{color:inherit}
+.muted{color:var(--muted)}
+
+/* верхняя полоса */
+.top{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;padding:12px 28px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{font-weight:650;font-size:17px;margin-right:auto;letter-spacing:-.01em}
+.file-state{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);padding:6px 10px;border-radius:var(--r-m)}
+.file-state:hover{background:var(--soft)}
+.file-state i{width:8px;height:8px;border-radius:50%;background:var(--sun);flex:0 0 auto}
+.file-state.ok i{background:var(--ok)}
+.file-state.warn{color:var(--sun-ink)}
+.menu-btn{border:1px solid var(--line);border-radius:var(--r-m);min-height:38px;padding:0 14px;font-weight:600}
+.menu-btn:hover{background:var(--soft)}
+
+/* раскладка */
+.layout{display:grid;grid-template-columns:380px minmax(0,1fr);gap:36px;max-width:1280px;margin:0 auto;padding:28px}
+
+/* форма звонка */
+.composer{position:sticky;top:86px;align-self:start;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-l);padding:20px 20px 16px;max-height:calc(100vh - 112px);overflow:auto}
+.composer-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.composer-head h2{font-size:19px;font-weight:650;margin-right:auto;letter-spacing:-.01em}
+.link{color:var(--teal);font-weight:600;font-size:14px;padding:4px 2px}
+.ico{display:block;flex:0 0 auto}
+.sheet-close{display:none;width:36px;height:36px;border-radius:50%;color:var(--muted)}
+.field{margin-bottom:14px}
+.field>label,.lbl{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
+input,textarea,select{font:inherit;font-size:15px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:var(--r-m);padding:9px 12px;width:100%;min-height:44px}
+textarea{resize:vertical;min-height:64px;line-height:1.45}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--teal);outline-offset:-1px;border-color:transparent}
+input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:var(--teal);flex:0 0 auto}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pick button{min-height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-size:14px;font-weight:500}
+.pick button:hover{border-color:var(--teal)}
+.pick button[aria-pressed=true]{background:var(--teal);border-color:var(--teal);color:var(--teal-ink)}
+.pick .add-own{border-style:dashed;color:var(--teal);font-weight:600}
+.own{display:inline-flex;gap:6px;align-items:center}
+.own input{min-height:36px;width:170px;padding:4px 12px;border-radius:999px;background:var(--panel)}
+.pick .own-ok{background:var(--teal);border-color:var(--teal);color:var(--teal-ink);font-weight:600}
+.checks{margin-bottom:10px}
+.check{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;min-height:40px;cursor:pointer}
+.orig{margin:2px 0 6px 30px}
+.primary{display:inline-flex;align-items:center;justify-content:center;background:var(--teal);color:var(--teal-ink);border-radius:var(--r-m);min-height:46px;padding:0 20px;font-weight:650;font-size:15px}
+.primary:hover{filter:brightness(1.07)}
+.composer .primary{width:100%}
+.hint{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+.ghost{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:var(--r-m);min-height:40px;padding:0 14px;font-weight:550;font-size:14px}
+.ghost:hover{background:var(--soft)}
+
+/* выбор работника */
+.who{position:relative}
+.who-chip{display:flex;align-items:center;gap:10px;background:var(--teal-soft);border-radius:var(--r-m);padding:6px 6px 6px 12px;min-height:44px}
+.who-chip span{flex:1;min-width:0;overflow-wrap:anywhere}
+.who-chip small{color:var(--muted);font-size:13px;margin-left:8px;font-variant-numeric:tabular-nums}
+.who-chip button{width:32px;height:32px;border-radius:50%;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.who-chip button:hover{background:var(--panel)}
+.who-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:var(--shadow);padding:4px;max-height:300px;overflow:auto}
+.opt{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 10px;border-radius:var(--r-s);cursor:pointer}
+.opt small{color:var(--muted);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.opt.active,.opt:hover{background:var(--teal-soft)}
+.opt.add{color:var(--teal);font-weight:600}
+.new-worker{background:var(--soft);border-radius:var(--r-m);padding:12px}
+.new-worker .nw-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:14px;font-weight:600}
+.new-worker input{background:var(--panel);margin-bottom:8px}
+.new-worker input:last-child{margin-bottom:0}
+
+/* день */
+.day-nav{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:12px}
+.nav-arrow{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
+.nav-arrow:hover:not(:disabled){background:var(--panel);color:var(--ink)}
+.nav-arrow:disabled{opacity:.35;cursor:default}
+.day-title h1{font-size:30px;line-height:1.15;font-weight:650;letter-spacing:-.02em}
+.day-title p{color:var(--muted);font-size:14px;margin-top:2px}
+.day-tools{display:flex;gap:8px;align-items:center}
+.day-tools input{width:auto;min-height:40px;padding:6px 10px;background:var(--panel)}
+
+/* загрузчик: блокирует экран на время запроса к GitHub */
+.loader{position:fixed;inset:0;z-index:120;display:grid;place-items:center;background:rgba(8,18,24,.55);padding:16px;cursor:progress}
+.loader-box{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--shadow);padding:22px 24px;width:min(380px,100%);text-align:center;animation:loaderIn .2s .25s both;cursor:default}
+@keyframes loaderIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.spin{width:34px;height:34px;margin:0 auto 12px;border:3px solid var(--line);border-top-color:var(--teal);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-box p{font-size:15px;font-weight:600}
+.loader-box .loader-err{margin-top:6px;color:var(--danger);font-weight:500;font-size:14px;overflow-wrap:anywhere}
+.loader-box.shown{animation:none}
+.loader .btn-row{justify-content:center;margin-top:14px}
+.pass-box .note{font-size:13px;font-weight:400;color:var(--muted);margin:6px 0 12px;line-height:1.5}
+.pass-box input{margin-top:8px;text-align:left}
+.file-state.err{color:var(--danger)}
+.file-state.err i{background:var(--danger)}
+.file-state.busy i{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+
+/* угол по солнцу */
+.solar{margin-top:8px;background:var(--sun-soft);border-left:4px solid var(--sun);border-radius:var(--r-m);padding:10px 12px;font-size:14px;color:var(--sun-ink)}
+.solar-top{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap}
+.solar-val{font-size:24px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums}
+.solar-dir{font-weight:600;font-size:13px}
+.solar-sub{font-size:12.5px;margin-top:5px;line-height:1.45}
+.solar-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.solar button[data-sa],.solar button[data-now]{min-height:34px;padding:0 12px;border-radius:var(--r-m);background:var(--panel);color:var(--ink);border:1px solid color-mix(in srgb,var(--sun) 50%,transparent);font-weight:600;font-size:13px}
+.solar button[data-sa]:hover,.solar button[data-now]:hover{border-color:var(--sun)}
+.solar .link{font-size:12.5px;padding:0;color:var(--teal)}
+.solar-top button[data-sa]{background:var(--sun);color:#fff;border-color:var(--sun)}
+@media (prefers-color-scheme:dark){.solar-top button[data-sa]{color:#2a1c00}}
+
+/* лента суток */
+.tape{margin:22px 0 6px}
+.tape-track{position:relative;height:46px;background-color:var(--panel);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;
+  background-image:linear-gradient(to right,var(--soft) 1px,transparent 1px);background-size:calc(100% / 24) 100%}
+.mk{position:absolute;top:9px;bottom:9px;width:5px;margin-left:-2px;border-radius:3px;background:var(--teal);transition:top .12s,bottom .12s}
+.mk.open{background:var(--sun)}
+.mk:hover,.mk:focus-visible{top:4px;bottom:4px}
+.now{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--danger);opacity:.55;pointer-events:none}
+.tape-hours{position:relative;height:20px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tape-hours span{position:absolute;top:2px;transform:translateX(-50%)}
+.tape-hours span:first-child{transform:none}
+
+/* ожидают возврата */
+.waiting{margin-top:18px;background:var(--sun-soft);border-left:4px solid var(--sun);border-radius:var(--r-m);padding:12px 16px}
+.waiting h3{font-size:15px;font-weight:650;color:var(--sun-ink);margin-bottom:4px}
+.w-item{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;padding:7px 0;border-top:1px solid color-mix(in srgb,var(--sun) 25%,transparent)}
+.w-item:first-of-type{border-top:0}
+.w-item .what{flex:1 1 280px;min-width:0;overflow-wrap:anywhere;text-align:left;font-size:14px}
+.w-item .what:hover b{text-decoration:underline}
+.w-item .need{display:block;font-size:13px;font-weight:600;color:var(--sun-ink);margin-top:2px}
+.w-item .ago{font-size:13px;color:var(--sun-ink);font-variant-numeric:tabular-nums}
+.btn-return{min-height:34px;padding:0 12px;border-radius:var(--r-m);background:var(--panel);color:var(--ok);font-weight:650;font-size:13px;border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
+.btn-return:hover{background:color-mix(in srgb,var(--ok) 12%,var(--panel))}
+
+/* звонки */
+.calls{list-style:none;margin-top:18px;position:relative}
+.calls::before{content:'';position:absolute;left:75px;top:10px;bottom:10px;width:2px;background:var(--line)}
+.call{position:relative;display:grid;grid-template-columns:56px 20px minmax(0,1fr);column-gap:10px;padding:12px 14px 12px 0;border-radius:var(--r-m)}
+.call:hover{background:var(--panel)}
+.call.flash{animation:flash 1.8s ease-out}
+@keyframes flash{0%,35%{background:var(--teal-soft)}100%{background:transparent}}
+.c-time{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;line-height:1.35}
+.c-dot{width:14px;height:14px;border-radius:50%;background:var(--paper);border:3px solid var(--teal);margin:4px auto 0;position:relative;z-index:1}
+.call.is-open .c-dot{border-color:var(--sun);background:var(--sun)}
+.c-body{min-width:0}
+.c-who{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;line-height:1.35}
+.c-who b{font-size:16px}
+.c-who a{color:var(--muted);text-decoration:none;font-variant-numeric:tabular-nums;font-size:14px}
+.c-who a:hover{text-decoration:underline}
+.c-what{margin-top:3px;overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:12px;font-weight:650;padding:1px 8px;border-radius:var(--r-s);margin-right:4px;vertical-align:1px;background:hsl(var(--h) var(--tag-s) var(--tag-l));color:hsl(var(--h) 60% var(--tag-tl));white-space:nowrap}
+.c-state{display:block;margin-top:4px;font-size:13px;font-weight:600}
+.c-state.open{color:var(--sun-ink)}
+.c-state.done{color:var(--ok)}
+.c-state.link{color:var(--muted);font-weight:500}
+.c-notes{margin-top:4px;color:var(--muted);font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.c-acts{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:6px}
+.c-acts button{font-size:13px;font-weight:600;color:var(--teal);min-height:30px}
+.c-acts button:hover{text-decoration:underline}
+.c-acts .del{color:var(--danger)}
+.c-acts .ret{color:var(--ok)}
+@media (hover:hover) and (min-width:861px){.c-acts{position:absolute;top:10px;right:12px;margin:0;padding:2px 4px 2px 12px;background:var(--panel);border-radius:var(--r-s);opacity:0;transition:opacity .12s}.call:hover .c-acts,.call:focus-within .c-acts{opacity:1}}
+.empty{margin-top:28px;padding:34px 24px;border:1px dashed var(--line);border-radius:var(--r-l);text-align:center;color:var(--muted)}
+.empty .ghost{margin-top:14px;color:var(--ink)}
+
+/* мобильная кнопка и подложка */
+.fab{display:none;position:fixed;left:16px;right:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:45;box-shadow:var(--shadow)}
+.scrim{position:fixed;inset:0;background:rgba(8,18,24,.5);z-index:55}
+
+/* меню */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);z-index:60;background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;animation:slideIn .22s ease-out}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:var(--r-m);flex:1}
+.tabs button{flex:1;min-height:36px;border-radius:var(--r-s);font-size:14px;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected=true]{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.x-btn{width:38px;height:38px;border-radius:50%;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.x-btn:hover{background:var(--soft)}
+.tab{padding:18px 20px 40px;overflow:auto;flex:1}
+.tab h3{font-size:16px;font-weight:650;margin-bottom:6px}
+.tab p.note{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+.tab section{padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.tab section:last-child{border-bottom:0}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.w-form input{margin-bottom:8px}
+.w-form .btn-row{justify-content:flex-end;margin-top:4px}
+.w-row{padding:12px 0;border-top:1px solid var(--line)}
+.w-row:first-child{border-top:0}
+.w-row .w-name{font-weight:650;font-size:15px}
+.w-row a{color:var(--muted);text-decoration:none;font-variant-numeric:tabular-nums}
+.w-row .w-meta{font-size:13px;color:var(--muted)}
+.w-acts{display:flex;gap:16px;margin-top:4px}
+.w-acts button{font-size:13px;font-weight:600;color:var(--teal);min-height:30px}
+.w-acts .del{color:var(--danger)}
+.w-calls{list-style:none;margin-top:6px;border-left:2px solid var(--line);padding-left:10px}
+.w-calls button{display:block;text-align:left;font-size:13px;padding:4px 0;color:var(--ink)}
+.w-calls button:hover{color:var(--teal)}
+.w-calls time{font-variant-numeric:tabular-nums;color:var(--muted);margin-right:6px}
+.inline{display:flex;gap:8px;align-items:center}
+.inline select{width:auto;flex:1}
+.backup-state{font-size:14px;font-weight:600;margin-bottom:10px}
+.backup-state.old{color:var(--sun-ink)}
+
+/* уведомление */
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,120px);display:flex;align-items:center;gap:16px;background:var(--ink);color:var(--paper);padding:11px 16px 11px 18px;border-radius:var(--r-m);font-size:14px;font-weight:500;box-shadow:var(--shadow);z-index:90;transition:transform .25s;max-width:calc(100% - 32px)}
+.toast.show{transform:translate(-50%,0)}
+.toast.error{background:var(--danger);color:#fff}
+.toast button{color:var(--teal-soft);font-weight:700;font-size:14px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* телефон */
+@media (max-width:860px){
+  .top{padding:10px 16px}
+  .layout{grid-template-columns:1fr;padding:16px 16px 96px;gap:0}
+  .composer{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:60;max-height:92vh;max-height:92dvh;border-radius:18px 18px 0 0;border-bottom:0;transform:translateY(105%);transition:transform .25s ease-out;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  .composer.open{transform:none}
+  .sheet-close{display:inline-flex;align-items:center;justify-content:center}
+  .fab{display:flex}
+  .day-nav{grid-template-columns:auto 1fr auto}
+  .day-tools{grid-column:1/-1;justify-content:flex-start}
+  .day-title h1{font-size:23px}
+  .file-state span{display:none}
+  .call{grid-template-columns:48px 18px minmax(0,1fr);column-gap:8px}
+  .calls::before{left:64px}
+  .tape-hours .minor{display:none}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(-50%,240px)}
+}
+@media (hover:none){.hint{display:none}}
+@media (max-width:420px){.row2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<h1>Журнал диспетчера</h1>
-<p>Полный <code>index.html</code> (~120&nbsp;КБ) не удалось залить через API одним запросом.</p>
-<p>Скачайте файл из проекта Grok (<code>artifacts/index.html</code>) и замените <code>index.html</code> в репозитории вручную:</p>
-<ol>
-<li>Откройте <a href="https://github.com/speed660/scada-log-app">speed660/scada-log-app</a></li>
-<li>Файл <code>index.html</code> → Edit → вставьте содержимое → Commit</li>
-</ol>
-<p>Или через git:</p>
-<pre>git add index.html && git commit -m "Полный index.html" && git push</pre>
+
+<header class="top">
+  <div class="brand">Журнал диспетчера</div>
+  <button type="button" class="file-state" id="fileState"><i></i><span id="fileStateText"></span></button>
+  <button type="button" class="menu-btn" id="btnMenu">Меню</button>
+</header>
+
+<main class="layout">
+  <aside class="composer" id="composer" aria-label="Новый звонок">
+    <div class="composer-head">
+      <h2 id="cTitle">Новый звонок</h2>
+      <button type="button" class="link" id="btnCancelEdit" hidden>Отмена</button>
+      <button type="button" class="sheet-close" id="btnSheetClose" aria-label="Закрыть"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <form id="form" autocomplete="off">
+      <div class="field">
+        <label for="fWho">Кто звонил</label>
+        <div class="who">
+          <div class="who-chip" id="whoChip" hidden><span id="whoChipText"></span><button type="button" id="whoClear" aria-label="Выбрать другого"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <input id="fWho" placeholder="Имя или номер телефона" role="combobox" aria-expanded="false" aria-controls="whoList" aria-autocomplete="list">
+          <div class="who-list" id="whoList" role="listbox" hidden></div>
+        </div>
+        <div class="new-worker" id="newWorker" hidden>
+          <div class="nw-head"><span>Новый работник в базе</span><button type="button" class="link" id="nwCancel">Отмена</button></div>
+          <input id="nwName" placeholder="Имя и фамилия">
+          <input id="nwPhone" placeholder="+998 90 123 45 67" inputmode="tel" autocomplete="off">
+        </div>
+      </div>
+      <div class="field"><span class="lbl">Устройство</span><div class="pick" id="pType"></div></div>
+      <div class="row2">
+        <div class="field"><label for="fDev">Номер</label><input id="fDev" list="dlDev" placeholder="TCU-045"></div>
+        <div class="field"><label for="fLoc">Место</label><input id="fLoc" list="dlLoc" placeholder="Блок 3, ряд 14"></div>
+      </div>
+      <div class="field"><span class="lbl">Что просили</span><div class="pick" id="pAction"></div></div>
+      <div class="field" id="angleGroup" hidden><label for="fAngle">Угол наклона, °</label><input id="fAngle" inputmode="decimal" placeholder="30"><div class="solar" id="solar" aria-live="polite"></div></div>
+      <div class="field"><label for="fTs">Время звонка</label><input id="fTs" type="datetime-local"></div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="fOpen"> Устройство остановлено, нужно запустить</label>
+        <label class="check"><input type="checkbox" id="fRestore"> Потом вернуть в исходное состояние</label>
+        <div class="orig" id="origGroup" hidden><input id="fOrig" list="dlOrig" placeholder="Каким было: авто, угол 0°…" aria-label="Исходное состояние"></div>
+      </div>
+      <div class="field"><label for="fNotes">Примечание</label><textarea id="fNotes" rows="2" placeholder="Причина, детали"></textarea></div>
+      <button type="submit" class="primary" id="btnSave">Записать</button>
+      <p class="hint">Ctrl+Enter, чтобы записать</p>
+    </form>
+  </aside>
+
+  <section aria-label="Звонки за день">
+    <div class="day-nav">
+      <button type="button" class="nav-arrow" id="prevDay" aria-label="Предыдущий день"><svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="day-title"><h1 id="dayTitle"></h1><p id="daySub"></p></div>
+      <button type="button" class="nav-arrow" id="nextDay" aria-label="Следующий день"><svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      <div class="day-tools">
+        <button type="button" class="ghost" id="btnToday">Сегодня</button>
+        <input type="date" id="dayPick" aria-label="Выбрать дату">
+      </div>
+    </div>
+    <div class="tape">
+      <div class="tape-track" id="tapeTrack" aria-label="Звонки на шкале суток"></div>
+      <div class="tape-hours" id="tapeHours"></div>
+    </div>
+    <div class="waiting" id="waiting" hidden><h3 id="waitTitle"></h3><div id="waitList"></div></div>
+    <ol class="calls" id="calls"></ol>
+    <div class="empty" id="empty" hidden></div>
+  </section>
+</main>
+
+<button type="button" class="primary fab" id="fab">Записать звонок</button>
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="drawer" id="drawer" aria-label="Меню" hidden>
+  <div class="drawer-head">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="workers">Работники</button>
+      <button type="button" role="tab" data-tab="data">Данные</button>
+      <button type="button" role="tab" data-tab="lists">Настройки</button>
+    </div>
+    <button type="button" class="x-btn" id="drawerClose" aria-label="Закрыть меню"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <div class="tab" id="tab-workers" role="tabpanel">
+    <section>
+      <form class="w-form" id="wForm" autocomplete="off">
+        <h3 id="wFormTitle">Добавить работника</h3>
+        <input id="wName" placeholder="Имя и фамилия">
+        <input id="wPhone" placeholder="+998 90 123 45 67" inputmode="tel" autocomplete="off">
+        <input id="wNote" placeholder="Примечание: бригада, подрядчик">
+        <div class="btn-row">
+          <button type="button" class="ghost" id="wCancel" hidden>Отмена</button>
+          <button type="submit" class="primary">Сохранить</button>
+        </div>
+      </form>
+    </section>
+    <section>
+      <input id="wFilter" placeholder="Найти по имени или номеру" style="margin-bottom:6px">
+      <div id="wList"></div>
+    </section>
+  </div>
+
+  <div class="tab" id="tab-data" role="tabpanel" hidden>
+    <section id="ghSection">
+      <h3>GitHub</h3>
+      <div id="ghForm">
+        <p class="note">Журнал сохраняется в файл приватного репозитория GitHub и подтягивает записи других диспетчеров. Токен: GitHub → Settings → Developer settings → Fine-grained tokens, доступ только к этому репозиторию, право Contents: Read and write. Токен хранится в этом браузере только зашифрованным паролем, при открытии страницы пароль спрашивается один раз. В файл журнала и в резервную копию токен не попадает. Пароль не восстанавливается: если забыл, подключи GitHub заново.</p>
+        <div class="field"><label for="ghRepo">Приватный репозиторий</label><input id="ghRepo" placeholder="владелец/репозиторий" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="row2">
+          <div class="field"><label for="ghPath">Файл</label><input id="ghPath" value="scada-log.json" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+          <div class="field"><label for="ghBranch">Ветка</label><input id="ghBranch" placeholder="по умолчанию" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        </div>
+        <div class="field"><label for="ghToken">Токен доступа</label><input id="ghToken" type="password" autocomplete="off" placeholder="github_pat_…" spellcheck="false"></div>
+        <div class="row2">
+          <div class="field"><label for="ghPass">Пароль для токена</label><input id="ghPass" type="password" autocomplete="off" placeholder="не короче 8 символов" spellcheck="false"></div>
+          <div class="field"><label for="ghPass2">Пароль ещё раз</label><input id="ghPass2" type="password" autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="btn-row"><button type="button" class="primary" id="btnGhConnect">Подключить</button></div>
+      </div>
+      <div id="ghOn" hidden>
+        <p class="backup-state" id="ghInfo"></p>
+        <p class="note">Каждое изменение отправляется в GitHub через пару секунд, новые записи других диспетчеров подтягиваются раз в минуту. Без связи журнал работает в браузере и отправит накопленное, когда связь появится.</p>
+        <p class="note">«Заблокировать» убирает токен из памяти, например перед сдачей смены. Записи продолжают сохраняться в браузере и уйдут в GitHub после ввода пароля.</p>
+        <div class="btn-row"><button type="button" class="primary" id="btnGhUnlock" hidden>Разблокировать</button><button type="button" class="primary" id="btnGhSync">Синхронизировать сейчас</button><button type="button" class="ghost" id="btnGhLock">Заблокировать</button><button type="button" class="ghost" id="btnGhOff">Отключить</button></div>
+      </div>
+    </section>
+    <section>
+      <h3>Рабочий файл</h3>
+      <p class="note" id="fileNote"></p>
+      <div class="btn-row">
+        <button type="button" class="primary" id="btnReconnect" hidden>Подключить</button>
+        <button type="button" class="ghost" id="btnNewFile">Создать новый файл</button>
+        <button type="button" class="ghost" id="btnOpenFile">Открыть файл</button>
+      </div>
+    </section>
+    <section>
+      <h3>Excel</h3>
+      <p class="note">Таблица звонков и список работников в файле .xlsx.</p>
+      <div class="inline">
+        <select id="xlRange" aria-label="Период для Excel">
+          <option value="day">Выбранный день</option>
+          <option value="month">Месяц выбранного дня</option>
+          <option value="all">Все записи</option>
+        </select>
+        <button type="button" class="primary" id="btnXlsx">Скачать Excel</button>
+      </div>
+    </section>
+    <section>
+      <h3>Резервная копия</h3>
+      <p class="backup-state" id="backupState"></p>
+      <p class="note">Разовая копия всех данных на флешку, другой компьютер или телефон. В отличие от рабочего файла, она сама не обновляется. Загрузка добавляет записи из копии к текущим и ничего не удаляет.</p>
+      <div class="btn-row">
+        <button type="button" class="primary" id="btnExport">Скачать копию</button>
+        <button type="button" class="ghost" id="btnImport">Загрузить копию</button>
+        <input type="file" id="importInput" accept=".json,application/json" hidden>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab" id="tab-lists" role="tabpanel" hidden>
+    <section>
+      <h3>Списки для формы</h3>
+      <div class="field"><label for="sTypes">Устройства, по одному на строку</label><textarea id="sTypes" rows="7"></textarea></div>
+      <div class="field"><label for="sActions">Что просят, по одному на строку</label><textarea id="sActions" rows="9"></textarea></div>
+      <p class="note">«Остановка» и «отключение» сразу ставят отметку «нужно запустить». «Ручной», «угол» и «наклон» ставят отметку «вернуть в исходное», а «угол» и «наклон» ещё открывают поле угла. Новые пункты можно добавлять и прямо в форме кнопкой «+ Своё».</p>
+      <div class="btn-row">
+        <button type="button" class="ghost" id="btnResetLists">Вернуть стандартные</button>
+        <button type="button" class="primary" id="btnSaveLists">Сохранить списки</button>
+      </div>
+    </section>
+    <section>
+      <h3>Станция и трекеры</h3>
+      <p class="note">Нужно, чтобы форма подсказывала угол по солнцу. Координаты станции можно взять в Google Maps: нажми правой кнопкой на станцию, первая строка в меню и есть широта и долгота. Её можно вставить целиком в поле «Широта».</p>
+      <div class="row2">
+        <div class="field"><label for="sLat">Широта</label><input id="sLat" inputmode="decimal" placeholder="41.3111"></div>
+        <div class="field"><label for="sLon">Долгота</label><input id="sLon" inputmode="decimal" placeholder="69.2797"></div>
+      </div>
+      <div class="btn-row" style="margin-bottom:14px"><button type="button" class="ghost" id="btnGeo">Определить по GPS этого устройства</button></div>
+      <div class="row2">
+        <div class="field"><label for="sMax">Предельный угол трекера, °</label><input id="sMax" inputmode="decimal" placeholder="60"></div>
+        <div class="field"><label for="sGcr">GCR (необязательно)</label><input id="sGcr" inputmode="decimal" placeholder="0,35"></div>
+      </div>
+      <div class="field"><label for="sSign">Знак угла в SCADA</label><select id="sSign"><option value="w">+ на запад, − на восток</option><option value="e">+ на восток, − на запад</option></select></div>
+      <p class="note">GCR: ширина стола, делённая на расстояние между рядами. Если указать, расчёт учтёт backtracking (утром и вечером стол выравнивается, чтобы ряды не затеняли друг друга). Если на станции backtracking выключен, оставь пустым. Предел угла и знак возьми из паспорта трекера или с экрана SCADA.</p>
+      <div class="btn-row"><button type="button" class="primary" id="btnSaveSite">Сохранить станцию</button></div>
+    </section>
+  </div>
+</aside>
+
+<div class="loader" id="loader" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="loaderText" hidden>
+  <div class="loader-box" tabindex="-1" id="loaderBox">
+    <div class="spin" id="loaderSpin"></div>
+    <p id="loaderText"></p>
+    <p class="loader-err" id="loaderErr" hidden></p>
+    <div class="btn-row" id="loaderBtns" hidden>
+      <button type="button" class="primary" id="loaderRetry">Повторить</button>
+      <button type="button" class="ghost" id="loaderClose">Закрыть</button>
+    </div>
+  </div>
+</div>
+<div class="loader" id="passDlg" role="dialog" aria-modal="true" aria-labelledby="pdTitle" hidden>
+  <form class="loader-box pass-box shown" id="pdForm" autocomplete="off">
+    <p id="pdTitle"></p>
+    <p class="note" id="pdText"></p>
+    <input id="pd1" type="password" autocomplete="off" spellcheck="false" aria-label="Пароль">
+    <input id="pd2" type="password" autocomplete="off" spellcheck="false" placeholder="Пароль ещё раз" aria-label="Пароль ещё раз" hidden>
+    <p class="loader-err" id="pdErr" hidden></p>
+    <div class="btn-row"><button type="submit" class="primary" id="pdOk"></button><button type="button" class="ghost" id="pdCancel"></button></div>
+  </form>
+</div>
+<datalist id="dlDev"></datalist><datalist id="dlLoc"></datalist><datalist id="dlOrig"></datalist>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastAct" hidden></button></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const LS_KEY = 'scadalog.v2';
+const LS_OLD = 'worklog.v1';
+const LS_BACKUP = 'scadalog.lastBackup';
+const FS_OK = 'showSaveFilePicker' in window;
+const JSON_TYPES = [{ description: 'JSON', accept: { 'application/json': ['.json'] } }];
+const DEFAULTS = {
+  deviceTypes: ['TCU', 'Трансформатор', 'Инвертор', 'DC-бокс', 'Панель / стринг', 'Другое'],
+  actions: ['Остановка', 'Запуск', 'Ручной режим', 'Изменение угла', 'Возврат в авто', 'Сброс аварии', 'Справка / проверка', 'Другое']
+};
+const RX_OPEN = /остан|отключ/i;            // → «нужно запустить»
+const RX_RESTORE = /ручн|угл|угол|наклон/i; // → «вернуть в исходное»
+const RX_ANGLE = /угл|угол|наклон/i;
+const RX_AUTO = /авто|исходн/i;
+const RX_RUN = /запуск|включ|пуск/i;
+const mqMobile = window.matchMedia('(max-width: 860px)');
+
+/* ---------- утилиты ---------- */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const iso = v => { const d = new Date(v); return (v === '' || v == null || isNaN(d)) ? new Date().toISOString() : d.toISOString(); };
+const str = v => String(v ?? '').trim();
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const hm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+const dayKey = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const fromKey = k => new Date(k + 'T00:00:00');
+const todayKey = () => dayKey(new Date());
+const toLocalInput = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+const fmtAngle = a => String(a).replace('.', ',');
+const hue = s => { let h = 11; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) % 360; return h; };
+const isPhoneLike = q => /^[\d\s+()\-]{5,}$/.test(q.trim());
+function plural(n, one, few, many) {
+  const a = n % 10, b = n % 100;
+  return n + ' ' + (a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many);
+}
+const calls = n => plural(n, 'звонок', 'звонка', 'звонков');
+const PHONE_BAD = 'Номер неполный. Нужно +998 и 9 цифр';
+function normPhone(raw) { let d = String(raw || '').replace(/\D/g, ''); if (d.length === 9) d = '998' + d; return d; }
+function fmtPhone(d) {
+  if (!d) return '';
+  if (d.length === 12 && d.startsWith('998')) return `+998 ${d.slice(3, 5)} ${d.slice(5, 8)} ${d.slice(8, 10)} ${d.slice(10)}`;
+  return (d.length >= 10 ? '+' : '') + d;
+}
+// Маска узбекского номера: +998 XX XXX XX XX. Код страны подставляется сам, пользователь вводит 9 цифр.
+function maskUz(raw) {
+  raw = String(raw || '');
+  let d = raw.replace(/\D/g, '');
+  if (raw.trim().startsWith('+998') || (d.startsWith('998') && d.length > 9)) d = d.slice(3);
+  if (d.startsWith('998') && d.length > 9) d = d.slice(3); // вставили номер целиком в поле с готовым +998
+  d = d.slice(0, 9);
+  let t = '+998';
+  if (d) t += ' ' + d.slice(0, 2);
+  if (d.length > 2) t += ' ' + d.slice(2, 5);
+  if (d.length > 5) t += ' ' + d.slice(5, 7);
+  if (d.length > 7) t += ' ' + d.slice(7, 9);
+  return { text: t, local: d };
+}
+function phoneFrom(el) {
+  if (el.dataset.mask === 'off') return { phone: normPhone(el.value), bad: false };
+  const { local } = maskUz(el.value);
+  if (!local) return { phone: '', bad: false };
+  return local.length === 9 ? { phone: '998' + local, bad: false } : { phone: '', bad: true };
+}
+function bindMask(el) {
+  el.addEventListener('focus', () => {
+    if (el.dataset.mask === 'off' || el.value) return;
+    el.value = '+998 '; el.setSelectionRange(5, 5);
+  });
+  el.addEventListener('input', () => {
+    if (el.dataset.mask === 'off') return;
+    const raw = el.value, pos = el.selectionStart == null ? raw.length : el.selectionStart, atEnd = pos >= raw.length;
+    const left = maskUz(raw.slice(0, pos)).local.length;
+    const m = maskUz(raw);
+    el.value = m.local ? m.text : '+998 ';
+    let i = el.value.length;
+    if (!atEnd) { let c = 0; for (i = 5; i < el.value.length && c < left; i++) if (/\d/.test(el.value[i])) c++; }
+    el.setSelectionRange(i, i);
+  });
+  el.addEventListener('blur', () => { if (el.dataset.mask !== 'off' && !maskUz(el.value).local) el.value = ''; });
+}
+bindMask($('wPhone')); bindMask($('nwPhone'));
+
+function longDate(d) {
+  const o = { weekday: 'long', day: 'numeric', month: 'long' };
+  if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
+  const s = d.toLocaleDateString('ru-RU', o);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+const shortDate = d => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+function fmtAgo(fromIso) {
+  const min = Math.max(0, Math.floor((Date.now() - new Date(fromIso)) / 60000));
+  if (min < 60) return min + ' мин';
+  const h = Math.floor(min / 60);
+  if (h < 24) return h + ' ч ' + (min % 60) + ' мин';
+  return Math.floor(h / 24) + ' д ' + (h % 24) + ' ч';
+}
+function toast(msg, opt = {}) {
+  $('toastText').textContent = msg;
+  $('toast').classList.toggle('error', !!opt.error);
+  const b = $('toastAct');
+  b.hidden = !opt.action;
+  if (opt.action) { b.textContent = opt.action.label; b.onclick = () => { opt.action.fn(); $('toast').classList.remove('show'); }; }
+  $('toast').classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => $('toast').classList.remove('show'), opt.action ? 6000 : 2600);
+}
+
+/* ---------- данные ---------- */
+const DEF_SITE = { lat: 41.3111, lon: 69.2797, maxAngle: 60, gcr: null, westPositive: true, set: false }; // по умолчанию Ташкент
+function normSite(s) {
+  s = s && typeof s === 'object' ? s : {};
+  const n = (v, d, lo, hi) => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(x) && x >= lo && x <= hi ? x : d; };
+  return {
+    lat: n(s.lat, DEF_SITE.lat, -90, 90), lon: n(s.lon, DEF_SITE.lon, -180, 180),
+    maxAngle: n(s.maxAngle, DEF_SITE.maxAngle, 10, 90), gcr: n(s.gcr, null, 0.1, 0.95),
+    westPositive: s.westPositive !== false, set: !!s.set
+  };
+}
+function normSettings(raw) {
+  const list = (v, d) => { const a = Array.isArray(v) ? [...new Set(v.map(str).filter(Boolean))] : []; return a.length ? a : [...d]; };
+  return {
+    deviceTypes: list(raw && raw.deviceTypes, DEFAULTS.deviceTypes),
+    actions: list(raw && raw.actions, DEFAULTS.actions),
+    site: normSite(raw && raw.site),
+    updatedAt: raw && raw.updatedAt ? iso(raw.updatedAt) : ''
+  };
+}
+function normEntry(e) {
+  if (!e || typeof e !== 'object') return null;
+  const legacy = 'text' in e && !('action' in e); // самая первая версия
+  const a = e.angle === '' || e.angle == null || !isFinite(+e.angle) ? null : +e.angle;
+  const out = {
+    id: str(e.id) || uid(), ts: iso(e.ts || e.createdAt),
+    workerId: str(e.workerId), callerName: str(e.callerName || e.caller), callerPhone: normPhone(e.callerPhone),
+    deviceType: legacy ? 'Другое' : str(e.deviceType), location: legacy ? str(e.tag) : str(e.location),
+    device: str(e.device), action: legacy ? 'Другое' : str(e.action), angle: a,
+    open: !!e.open, restore: !!e.restore, origState: str(e.origState),
+    linkedTo: str(e.linkedTo), closedBy: str(e.closedBy),
+    notes: legacy ? str(e.text) : str(e.notes),
+    createdAt: iso(e.createdAt || e.ts), updatedAt: iso(e.updatedAt || e.createdAt || e.ts), deleted: !!e.deleted
+  };
+  return (out.action || out.device || out.location || out.notes) ? out : null;
+}
+function normWorker(w) {
+  if (!w || typeof w !== 'object') return null;
+  const out = {
+    id: str(w.id) || uid(), name: str(w.name), phone: normPhone(w.phone), note: str(w.note),
+    createdAt: iso(w.createdAt), updatedAt: iso(w.updatedAt || w.createdAt), deleted: !!w.deleted
+  };
+  return (out.name || out.phone) ? out : null;
+}
+function parseData(data) {
+  const arr = Array.isArray(data) ? data : (data && Array.isArray(data.entries) ? data.entries : null);
+  if (!arr) throw new Error('Это не файл журнала');
+  const obj = Array.isArray(data) ? {} : data;
+  return {
+    entries: arr.map(normEntry).filter(Boolean),
+    workers: Array.isArray(obj.workers) ? obj.workers.map(normWorker).filter(Boolean) : [],
+    settings: obj.settings ? normSettings(obj.settings) : null
+  };
+}
+// Слияние по id: побеждает более свежая правка. Удалённое остаётся пометкой, чтобы не «воскресало» при загрузке копии.
+function mergeById(a, b) {
+  const m = new Map();
+  for (const x of [...a, ...b]) { const c = m.get(x.id); if (!c || x.updatedAt > c.updatedAt) m.set(x.id, x); }
+  return [...m.values()];
+}
+function absorb(got) {
+  state.entries = mergeById(state.entries, got.entries);
+  state.workers = mergeById(state.workers, got.workers);
+  if (got.settings && got.settings.updatedAt > state.settings.updatedAt) state.settings = got.settings;
+}
+
+let state = { entries: [], workers: [], settings: normSettings(null) };
+let fileHandle = null, pendingHandle = null, writeChain = Promise.resolve(), fileError = false;
+let viewDay = todayKey();
+let editingId = null, linkingId = null, tsAuto = true;
+const form = { type: '', action: '', workerId: '', newWorker: false };
+
+const alive = () => state.entries.filter(e => !e.deleted);
+const aliveW = () => state.workers.filter(w => !w.deleted);
+const find = id => state.entries.find(e => e.id === id);
+const findW = id => id ? state.workers.find(w => w.id === id) : null;
+const isPending = e => (e.open || e.restore) && !e.closedBy;
+function callerOf(e) {
+  const w = findW(e.workerId);
+  if (w && !w.deleted) return { name: w.name, phone: w.phone };
+  return { name: e.callerName, phone: e.callerPhone };
+}
+function needText(e) {
+  const parts = [];
+  if (e.open) parts.push('нужно запустить');
+  if (e.restore) parts.push('вернуть в исходное' + (e.origState ? ': ' + e.origState : ''));
+  const s = parts.join('; ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function workerStats() {
+  const m = new Map();
+  for (const e of alive()) {
+    if (!e.workerId) continue;
+    const s = m.get(e.workerId) || { n: 0, last: '' };
+    s.n++; if (e.ts > s.last) s.last = e.ts;
+    m.set(e.workerId, s);
+  }
+  return m;
+}
+function serialize() {
+  return JSON.stringify({ app: 'scada-log', version: 4, savedAt: new Date().toISOString(), settings: state.settings, workers: state.workers, entries: state.entries }, null, 2);
+}
+function persist() { saveLocal(); ghSchedule(); }
+function saveLocal() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ settings: state.settings, workers: state.workers, entries: state.entries })); } catch (e) { console.warn(e); }
+  writeFile();
+}
+function writeFile() {
+  if (!fileHandle) return;
+  const h = fileHandle, data = serialize();
+  writeChain = writeChain.then(async () => {
+    const w = await h.createWritable(); await w.write(data); await w.close();
+    if (fileError) { fileError = false; updateFileUI(); }
+  }).catch(err => {
+    console.error(err); fileError = true; updateFileUI();
+    toast('Не удалось записать в файл. Данные сохранены в браузере', { error: true });
+  });
+}
+
+/* ---------- IndexedDB: только ссылка на рабочий файл ---------- */
+function idb(mode, fn) {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('scadalog', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onerror = () => rej(r.error);
+    r.onsuccess = () => {
+      const tx = r.result.transaction('kv', mode);
+      const req = fn(tx.objectStore('kv'));
+      tx.oncomplete = () => res(req && req.result);
+      tx.onerror = () => rej(tx.error);
+    };
+  });
+}
+
+/* ---------- рабочий файл ---------- */
+const fail = e => { if (e && e.name !== 'AbortError') toast(e.message || String(e), { error: true }); };
+function updateFileUI() {
+  const st = $('fileState');
+  let text, cls = 'warn', note;
+  if (fileHandle && !fileError) { text = 'Сохраняется в ' + fileHandle.name; cls = 'ok'; note = 'Подключён ' + fileHandle.name + '. Каждая запись сразу сохраняется в него.'; }
+  else if (fileHandle) { text = 'Ошибка записи в ' + fileHandle.name; note = 'Последняя запись в файл не удалась. Данные есть в браузере, подключи файл заново.'; }
+  else if (pendingHandle) { text = 'Подключить ' + pendingHandle.name; note = 'После перезапуска браузер просит подтвердить доступ к файлу ' + pendingHandle.name + '.'; }
+  else if (FS_OK) { text = 'Не сохраняется в файл'; note = 'Сейчас данные только в этом браузере. Создай файл или открой существующий, и каждая запись будет сохраняться в него автоматически.'; }
+  else { text = 'Хранится в браузере'; cls = ''; note = 'Этот браузер не умеет писать в файл (нужен Chrome или Edge на компьютере). Для переноса используй резервную копию.'; }
+  if (gh.cfg) { const g = ghStatus(); text = g.text; cls = g.cls; if (!fileHandle) note = 'Основное хранилище: GitHub. Локальный файл необязателен, его можно подключить дополнительно.'; }
+  st.className = 'file-state ' + cls;
+  $('fileStateText').textContent = text;
+  st.title = text;
+  $('fileNote').textContent = note;
+  $('btnReconnect').hidden = !pendingHandle;
+  if (pendingHandle) $('btnReconnect').textContent = 'Подключить ' + pendingHandle.name;
+  $('btnNewFile').hidden = $('btnOpenFile').hidden = !FS_OK;
+}
+async function connect(handle) {
+  if (await handle.queryPermission({ mode: 'readwrite' }) !== 'granted' &&
+      await handle.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Нет доступа к файлу');
+  const txt = await (await handle.getFile()).text();
+  if (txt.trim()) absorb(parseData(JSON.parse(txt)));
+  fileHandle = handle; pendingHandle = null; fileError = false;
+  try { await idb('readwrite', s => s.put(handle, 'handle')); } catch (e) { console.warn(e); }
+  updateFileUI(); persist(); renderPickers(); render(); renderDrawer();
+  toast('Файл подключён: ' + handle.name);
+}
+$('btnNewFile').onclick = async () => { try { await connect(await showSaveFilePicker({ suggestedName: 'scada-log.json', types: JSON_TYPES })); } catch (e) { fail(e); } };
+$('btnOpenFile').onclick = async () => { try { const [h] = await showOpenFilePicker({ types: JSON_TYPES }); await connect(h); } catch (e) { fail(e); } };
+$('btnReconnect').onclick = async () => { try { await connect(pendingHandle); } catch (e) { fail(e); } };
+$('fileState').onclick = async () => {
+  if (gh.cfg && !ghToken) { ghUnlock(); return; }
+  if (pendingHandle) { try { await connect(pendingHandle); } catch (e) { fail(e); } }
+  else openDrawer('data');
+};
+
+/* ---------- GitHub: журнал в файле приватного репозитория ---------- */
+const GH_KEY = 'scadalog.gh';
+let GH_TIMEOUT = 15000; // сколько ждём ответа GitHub, мс
+const gh = { cfg: null, sealed: null, knownSha: null, etag: null, remoteCanon: null, dirty: false, running: null, again: false, err: null, lastOk: null, halted: false, timer: null, retryTimer: null, retryMs: 0 };
+class GhError extends Error { constructor(msg, o) { super(msg); Object.assign(this, o); } }
+const netErr = e => new GhError(e && e.name === 'AbortError' ? 'GitHub не ответил за ' + Math.round(GH_TIMEOUT / 1000) + ' с' : 'Нет связи с GitHub', { kind: 'net' });
+const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+function stable(v) {
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  return JSON.stringify(v);
+}
+// Отпечаток данных без служебных полей: так видно, отличается ли локальная копия от репозитория.
+const canon = (src = state) => stable({ s: src.settings, w: [...src.workers].sort(byId), e: [...src.entries].sort(byId) });
+const b64enc = t => { const b = new TextEncoder().encode(t); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
+const b64dec = t => { const s = atob(String(t).replace(/\s/g, '')), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return new TextDecoder().decode(a); };
+const encPath = p => p.split('/').map(encodeURIComponent).join('/');
+const ghApi = p => 'https://api.github.com/repos/' + gh.cfg.repo + p;
+const renderAll = () => { renderPickers(); render(); renderDrawer(); renderSolar(); };
+
+/* Токен GitHub. В localStorage лежит только шифротекст: AES-GCM, ключ из пароля через PBKDF2-SHA256.
+   Расшифрованный токен живёт в памяти этой вкладки и пропадает при закрытии, перезагрузке или «Заблокировать».
+   В AAD входят репозиторий, путь и ветка: если их подменить в localStorage, токен не расшифруется. */
+const TOK_ITER = 600000; // число итераций PBKDF2-SHA256 по рекомендации OWASP
+let ghToken = null, ghLegacy = false;
+const ghReady = () => !!(gh.cfg && ghToken);
+const b64u8 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const u8b64 = t => Uint8Array.from(atob(t), ch => ch.charCodeAt(0));
+const tokAad = c => new TextEncoder().encode('scadalog-gh|' + c.repo + '|' + c.path + '|' + c.branch);
+async function passKey(pass, salt, iter) {
+  if (!(window.crypto && crypto.subtle)) throw new Error('Шифрование недоступно: открой страницу из файла на диске или по https');
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass.normalize('NFC')), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function sealToken(token, pass, c) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await passKey(pass, salt, TOK_ITER);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: tokAad(c) }, key, new TextEncoder().encode(token)));
+  return { v: 1, iter: TOK_ITER, salt: b64u8(salt), iv: b64u8(iv), ct: b64u8(ct) };
+}
+async function openToken(tok, pass, c) {
+  const iter = Math.min(Math.max(+tok.iter || TOK_ITER, 100000), 5000000);
+  const key = await passKey(pass, u8b64(tok.salt), iter);
+  try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u8b64(tok.iv), additionalData: tokAad(c) }, key, u8b64(tok.ct))); }
+  catch (e) { throw new Error('Неверный пароль'); }
+}
+function saveGhCfg(tok) {
+  localStorage.setItem(GH_KEY, JSON.stringify({ repo: gh.cfg.repo, path: gh.cfg.path, branch: gh.cfg.branch, tok }));
+  gh.sealed = tok;
+}
+function ghLoadCfg() {
+  try {
+    const c = JSON.parse(localStorage.getItem(GH_KEY) || 'null');
+    if (!c || !/^[\w.-]+\/[\w.-]+$/.test(c.repo || '')) return;
+    const cfg = { repo: c.repo, path: c.path || 'scada-log.json', branch: c.branch || '' };
+    if (c.tok && c.tok.ct) { gh.cfg = cfg; gh.sealed = c.tok; }
+    else if (c.token) { // старая версия хранила токен открытым текстом: убираем его из браузера сразу
+      gh.cfg = cfg; ghToken = String(c.token); ghLegacy = true;
+      localStorage.setItem(GH_KEY, JSON.stringify(cfg));
+    } else { $('ghRepo').value = cfg.repo; $('ghPath').value = cfg.path; $('ghBranch').value = cfg.branch; }
+  } catch (e) { console.warn(e); }
+}
+function ghHttpError(r, d) {
+  const msg = d && d.message ? String(d.message) : '';
+  const left = r.headers.get('x-ratelimit-remaining'), retry = +r.headers.get('retry-after') || 0;
+  if (r.status === 401) return new GhError('Токен не подходит или истёк', { kind: 'auth', status: 401 });
+  if ((r.status === 403 || r.status === 429) && (left === '0' || retry || /rate limit/i.test(msg))) {
+    const reset = +r.headers.get('x-ratelimit-reset') || 0, wait = retry || Math.max(60, reset - Math.floor(Date.now() / 1000));
+    return new GhError('Лимит запросов GitHub, повторю через ' + Math.ceil(wait / 60) + ' мин', { kind: 'rate', wait, status: r.status });
+  }
+  if (r.status === 403) return new GhError('Нет доступа. У токена должно быть право Contents: Read and write на этот репозиторий', { kind: 'auth', status: 403 });
+  if (r.status === 404) return new GhError('Репозиторий, ветка или файл не найдены, либо у токена нет к ним доступа', { kind: 'notfound', status: 404 });
+  if (r.status === 409 || r.status === 422) return new GhError(msg || 'Конфликт версий файла', { kind: 'conflict', status: r.status });
+  if (r.status >= 500) return new GhError('GitHub временно недоступен (' + r.status + ')', { kind: 'net', status: r.status });
+  return new GhError('GitHub: ' + (msg || r.status), { kind: 'other', status: r.status });
+}
+// Один запрос с ограничением по времени. Таймер живёт, пока не прочитано тело ответа.
+async function ghFetch(url, opts = {}, allow = []) {
+  if (!ghToken) throw new GhError('GitHub заблокирован, нужен пароль', { kind: 'locked' });
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), GH_TIMEOUT);
+  try {
+    let r;
+    try {
+      r = await fetch(url, { ...opts, cache: 'no-store', signal: ctl.signal, headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + ghToken, ...(opts.headers || {}) } });
+    } catch (e) { throw netErr(e); }
+    let data = null;
+    if (r.status !== 304) { try { data = await r.json(); } catch (e) { if (ctl.signal.aborted) throw netErr(e); } }
+    if (r.ok || allow.includes(r.status)) return { status: r.status, headers: r.headers, data };
+    throw ghHttpError(r, data);
+  } finally { clearTimeout(timer); }
+}
+async function ghGet() {
+  const c = gh.cfg, h = {};
+  if (gh.etag && gh.knownSha) h['If-None-Match'] = gh.etag;
+  const r = await ghFetch(ghApi('/contents/' + encPath(c.path) + (c.branch ? '?ref=' + encodeURIComponent(c.branch) : '')), { headers: h }, [304, 404]);
+  if (r.status === 304) return { fresh: false };
+  if (r.status === 404) { gh.etag = null; gh.knownSha = null; return { fresh: true, text: null, sha: null }; } // файла ещё нет
+  const j = r.data;
+  if (!j || Array.isArray(j) || j.type !== 'file') throw new GhError('По этому пути в репозитории лежит не файл', { kind: 'notfound' });
+  gh.etag = r.headers.get('ETag');
+  if (j.sha === gh.knownSha) return { fresh: false };
+  let b = j.content;
+  if (!b && j.size > 0) b = (await ghFetch(ghApi('/git/blobs/' + j.sha))).data.content; // файл больше 1 МБ
+  return { fresh: true, text: j.size > 0 ? b64dec(b) : '', sha: j.sha };
+}
+// Один цикл: забрать новое из GitHub, слить с локальным, отправить разницу. При конфликте версий повторяет.
+async function ghSyncOnce() {
+  const c = gh.cfg;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const g = await ghGet();
+    if (g.fresh) {
+      let rc = null;
+      if (g.text != null && g.text.trim()) {
+        let got;
+        try { got = parseData(JSON.parse(g.text)); }
+        catch (e) { throw new GhError('Файл в GitHub не читается, поэтому я его не перезаписываю. Проверь файл в репозитории', { kind: 'corrupt' }); }
+        rc = canon({ settings: got.settings || state.settings, workers: got.workers, entries: got.entries });
+        const before = canon();
+        absorb(got);
+        if (canon() !== before) { saveLocal(); renderAll(); }
+      }
+      gh.knownSha = g.sha;
+      if (rc !== null && canon() === rc) { gh.remoteCanon = rc; gh.dirty = false; return; }
+      gh.remoteCanon = rc;
+    } else if (canon() === gh.remoteCanon) { gh.dirty = false; return; }
+    const snap = canon(), body = { message: 'Журнал ' + hm(new Date()) + ', записей: ' + alive().length, content: b64enc(serialize()) };
+    if (gh.knownSha) body.sha = gh.knownSha;
+    if (c.branch) body.branch = c.branch;
+    try {
+      const res = await ghFetch(ghApi('/contents/' + encPath(c.path)), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      gh.knownSha = res.data.content.sha; gh.etag = null; gh.remoteCanon = snap;
+      gh.dirty = canon() !== snap;
+      return;
+    } catch (e) {
+      if (e.kind !== 'conflict') throw e;
+      gh.etag = null; gh.knownSha = null; // кто-то записал раньше: забираем заново и сливаем
+      if (attempt === 3) throw e;
+    }
+  }
+}
+function ghRun() {
+  if (!ghReady()) return Promise.resolve({ ok: true });
+  if (gh.running) { gh.again = true; return gh.running; }
+  clearTimeout(gh.timer); clearTimeout(gh.retryTimer);
+  gh.running = (async () => {
+    try {
+      do { gh.again = false; await ghSyncOnce(); } while (gh.again);
+      gh.err = null; gh.halted = false; gh.retryMs = 0; gh.lastOk = new Date();
+      return { ok: true };
+    } catch (e) {
+      const err = e instanceof GhError ? e : new GhError((e && e.message) || String(e), { kind: 'other' });
+      gh.err = err;
+      if (err.kind === 'net' || err.kind === 'conflict') { gh.retryMs = Math.min((gh.retryMs || 4000) * 2, 120000); gh.retryTimer = setTimeout(ghRun, gh.retryMs); }
+      else if (err.kind === 'rate') gh.retryTimer = setTimeout(ghRun, (err.wait || 60) * 1000);
+      else gh.halted = true; // токен, права, репозиторий: само не пройдёт, нужно действие человека
+      return { ok: false, err };
+    } finally { gh.running = null; renderGh(); }
+  })();
+  renderGh();
+  return gh.running;
+}
+// Любое изменение данных: отправка через 1,5 с после последней правки, а не на каждый клик.
+function ghSchedule(delay = 1500) {
+  if (!gh.cfg) return;
+  gh.dirty = true; renderGh();
+  if (gh.halted || !ghToken) return;
+  clearTimeout(gh.timer); gh.timer = setTimeout(ghRun, delay);
+}
+function ghStatus() {
+  if (!ghToken) return { text: 'GitHub: заблокирован, нужен пароль' + (gh.dirty ? ', есть неотправленное' : ''), cls: 'warn' };
+  if (gh.running) return { text: 'GitHub: сохраняю…', cls: 'busy' };
+  if (gh.err) {
+    const soft = ['net', 'rate', 'conflict'].includes(gh.err.kind);
+    return { text: 'GitHub: ' + (soft ? 'нет связи, данные в браузере, повторю' : gh.err.message), cls: soft ? 'warn' : 'err' };
+  }
+  if (gh.dirty) return { text: 'GitHub: изменения ждут отправки', cls: 'warn' };
+  if (!gh.lastOk) return { text: 'GitHub: проверяю…', cls: 'warn' };
+  return { text: 'GitHub: сохранено в ' + hm(gh.lastOk), cls: 'ok' };
+}
+function renderGhSection() {
+  if (!$('ghSection')) return;
+  const on = !!gh.cfg;
+  $('ghForm').hidden = on; $('ghOn').hidden = !on;
+  if (!on) return;
+  const locked = !ghToken;
+  $('btnGhUnlock').hidden = !locked; $('btnGhSync').hidden = locked; $('btnGhLock').hidden = locked;
+  const g = ghStatus();
+  $('ghInfo').textContent = gh.cfg.repo + ', ' + (gh.cfg.branch ? 'ветка ' + gh.cfg.branch : 'ветка по умолчанию') + ', файл ' + gh.cfg.path + '. ' + g.text;
+  $('ghInfo').className = 'backup-state' + (g.cls === 'ok' || g.cls === 'busy' ? '' : ' old');
+}
+function renderGh() { updateFileUI(); renderGhSection(); }
+
+/* Загрузчик: на время запроса блокирует весь интерфейс и клавиатуру. Ошибка и таймаут показываются в нём же. */
+let uiBlocked = 0;
+const BLOCKED = ['header.top', 'main.layout', '#fab', '#drawer', '#scrim'];
+function setInert(on) { BLOCKED.forEach(q => { const el = document.querySelector(q); if (el) el.inert = on; }); }
+async function runBlocking(text, fn, opt = {}) {
+  const back = document.activeElement;
+  uiBlocked++; setInert(true); $('loaderBox').classList.remove('shown'); $('loader').hidden = false;
+  try {
+    for (;;) {
+      $('loaderText').textContent = text; $('loaderSpin').hidden = false; $('loaderErr').hidden = true; $('loaderBtns').hidden = true;
+      try { return await fn(); }
+      catch (e) {
+        if (e && e.cancelled) return null;
+        $('loaderBox').classList.add('shown'); // ошибку показываем сразу, без задержки
+        $('loaderSpin').hidden = true; $('loaderText').textContent = 'Не получилось';
+        $('loaderErr').textContent = (e && e.message) || String(e); $('loaderErr').hidden = false;
+        $('loaderClose').textContent = opt.closeLabel || 'Закрыть'; $('loaderBtns').hidden = false; $('loaderRetry').focus();
+        const act = await new Promise(res => { $('loaderRetry').onclick = () => res('retry'); $('loaderClose').onclick = () => res('close'); });
+        if (act === 'close') return null;
+      }
+    }
+  } finally {
+    $('loader').hidden = true;
+    if (--uiBlocked === 0) setInert(false);
+    if (back && back.isConnected && back.focus) try { back.focus(); } catch (e) { /* не важно */ }
+  }
+}
+
+/* Окно пароля. mode 'unlock': ввести пароль; 'set': задать пароль дважды. work(pass) бросает ошибку, если не вышло. */
+function passDialog(mode, work) {
+  return new Promise(resolve => {
+    const set = mode === 'set';
+    $('pdTitle').textContent = set ? 'Задай пароль для токена GitHub' : 'GitHub заблокирован';
+    $('pdText').textContent = set
+      ? 'Раньше токен лежал в браузере открытым текстом, сейчас он оттуда удалён. Задай пароль, и токен сохранится зашифрованным. Если нажать «Позже», токен проработает до закрытия страницы, потом его придётся вставить заново.'
+      : 'Введи пароль, чтобы отправлять записи в ' + gh.cfg.repo + ' и забирать записи других диспетчеров.';
+    $('pd1').placeholder = set ? 'Пароль, не короче 8 символов' : 'Пароль';
+    $('pd2').hidden = !set; $('pd1').value = $('pd2').value = ''; $('pdErr').hidden = true;
+    const okLabel = set ? 'Сохранить' : 'Разблокировать';
+    $('pdOk').textContent = okLabel; $('pdOk').disabled = false;
+    $('pdCancel').textContent = set ? 'Позже' : 'Работать без GitHub';
+    const back = document.activeElement;
+    uiBlocked++; setInert(true); $('passDlg').hidden = false; $('pd1').focus();
+    const err = m => { $('pdErr').textContent = m; $('pdErr').hidden = false; $('pd1').focus(); };
+    const done = ok => {
+      $('passDlg').hidden = true; $('pd1').value = $('pd2').value = '';
+      $('pdForm').onsubmit = null; $('pdCancel').onclick = null;
+      if (--uiBlocked === 0) setInert(false);
+      if (back && back.isConnected && back.focus) try { back.focus(); } catch (e) { /* не важно */ }
+      resolve(ok);
+    };
+    $('pdCancel').onclick = () => { if (!$('pdOk').disabled) done(false); };
+    $('pdForm').onsubmit = async ev => {
+      ev.preventDefault();
+      if ($('pdOk').disabled) return;
+      const p = $('pd1').value;
+      if (!p) return err('Введи пароль');
+      if (set && p.length < 8) return err('Пароль не короче 8 символов');
+      if (set && p !== $('pd2').value) return err('Пароли не совпадают');
+      $('pdOk').disabled = true; $('pdOk').textContent = 'Проверяю…'; $('pdErr').hidden = true;
+      try { await work(p); done(true); }
+      catch (e) { $('pdOk').disabled = false; $('pdOk').textContent = okLabel; err((e && e.message) || String(e)); $('pd1').select(); }
+    };
+  });
+}
+$('passDlg').addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); $('pdCancel').click(); } });
+
+const ghLoad = () => runBlocking('Загружаю журнал из GitHub…', async () => { gh.halted = false; const r = await ghRun(); if (!r.ok) throw r.err; }, { closeLabel: 'Работать без связи' });
+async function ghUnlock() {
+  if (!gh.cfg || ghToken) return true;
+  const ok = await passDialog('unlock', async p => { ghToken = await openToken(gh.sealed, p, gh.cfg); });
+  renderGh();
+  if (ok) await ghLoad();
+  return ok;
+}
+function ghLock() {
+  ghToken = null; clearTimeout(gh.timer); clearTimeout(gh.retryTimer);
+  renderGh();
+}
+function ghDisconnect() {
+  clearTimeout(gh.timer); clearTimeout(gh.retryTimer);
+  try { localStorage.removeItem(GH_KEY); } catch (e) { /* нет доступа */ }
+  ghToken = null; gh.sealed = null;
+  Object.assign(gh, { cfg: null, knownSha: null, etag: null, remoteCanon: null, dirty: false, err: null, lastOk: null, halted: false, retryMs: 0 });
+  renderGh();
+}
+$('btnGhConnect').onclick = async () => {
+  const repo = $('ghRepo').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/, '').replace(/\/+$/, '');
+  const path = $('ghPath').value.trim().replace(/^\/+/, '') || 'scada-log.json', branch = $('ghBranch').value.trim(), token = $('ghToken').value.trim();
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { toast('Репозиторий в формате владелец/название', { error: true }); $('ghRepo').focus(); return; }
+  if (token.length < 20) { toast('Вставь токен доступа целиком', { error: true }); $('ghToken').focus(); return; }
+  const pass = $('ghPass').value;
+  if (pass.length < 8) { toast('Пароль для токена не короче 8 символов', { error: true }); $('ghPass').focus(); return; }
+  if (pass !== $('ghPass2').value) { toast('Пароли не совпадают', { error: true }); $('ghPass2').focus(); return; }
+  const prev = { cfg: gh.cfg, token: ghToken, sealed: gh.sealed };
+  const ok = await runBlocking('Проверяю доступ к GitHub…', async () => {
+    gh.cfg = { repo, path, branch }; ghToken = token;
+    try {
+      const info = (await ghFetch(ghApi(''))).data;
+      if (info && info.permissions && !info.permissions.push) throw new GhError('У токена нет права записи в этот репозиторий. Нужно Contents: Read and write', { kind: 'auth' });
+      if (info && info.private === false && !confirm('Репозиторий публичный: журнал с именами и телефонами сможет прочитать любой. Всё равно подключить?')) throw Object.assign(new Error('Отменено'), { cancelled: true });
+      if (branch) await ghFetch(ghApi('/branches/' + encodeURIComponent(branch)));
+      Object.assign(gh, { knownSha: null, etag: null, remoteCanon: null, err: null, halted: false, lastOk: null });
+      const r = await ghRun();
+      if (!r.ok) throw r.err;
+      saveGhCfg(await sealToken(token, pass, gh.cfg));
+      return true;
+    } catch (e) { gh.cfg = prev.cfg; ghToken = prev.token; gh.sealed = prev.sealed; throw e; }
+  }, { closeLabel: 'Отмена' });
+  if (ok) { ['ghToken', 'ghPass', 'ghPass2'].forEach(id => { $(id).value = ''; }); renderGh(); toast('GitHub подключён, токен зашифрован'); } else renderGh();
+};
+$('btnGhUnlock').onclick = () => ghUnlock();
+$('btnGhLock').onclick = () => { ghLock(); toast('GitHub заблокирован. Записи сохраняются в браузере'); };
+$('btnGhSync').onclick = () => runBlocking('Синхронизирую с GitHub…', async () => { gh.halted = false; const r = await ghRun(); if (!r.ok) throw r.err; }, { closeLabel: 'Закрыть' });
+$('btnGhOff').onclick = () => {
+  if (!confirm('Отключить GitHub? Данные останутся в этом браузере, токен будет удалён из него.')) return;
+  ghDisconnect(); toast('GitHub отключён');
+};
+
+/* ---------- резервная копия ---------- */
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+}
+function renderBackupState() {
+  let last = '';
+  try { last = localStorage.getItem(LS_BACKUP) || ''; } catch (e) { /* нет доступа */ }
+  const el = $('backupState');
+  if (!last) { el.textContent = 'Копию ещё не скачивали'; el.className = 'backup-state old'; return; }
+  const d = new Date(last), days = Math.floor((Date.now() - d) / 86400000);
+  el.textContent = 'Последняя копия: ' + shortDate(d) + ' в ' + hm(d) + (days >= 1 ? ', ' + plural(days, 'день', 'дня', 'дней') + ' назад' : '');
+  el.className = 'backup-state' + (days >= 7 ? ' old' : '');
+}
+$('btnExport').onclick = () => {
+  download(new Blob([serialize()], { type: 'application/json' }), 'scada-log-копия-' + todayKey() + '.json');
+  try { localStorage.setItem(LS_BACKUP, new Date().toISOString()); } catch (e) { /* нет доступа */ }
+  renderBackupState();
+  toast('Копия скачана');
+};
+$('btnImport').onclick = () => $('importInput').click();
+$('importInput').onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const before = alive().length;
+    absorb(parseData(JSON.parse(await f.text())));
+    persist(); renderPickers(); render(); renderDrawer();
+    toast('Копия загружена: было ' + before + ', стало ' + alive().length);
+  } catch (err) { toast('Не удалось загрузить: ' + err.message, { error: true }); }
+  e.target.value = '';
+};
+
+/* ---------- Excel (.xlsx без библиотек) ---------- */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(files, type) {
+  const enc = new TextEncoder(), parts = [], central = [], now = new Date();
+  const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
+    h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true);
+    h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true);
+    c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true);
+    c.setUint32(42, offset, true);
+    central.push(new Uint8Array(c.buffer), name);
+    offset += 30 + name.length + data.length;
+  }
+  const size = central.reduce((s, a) => s + a.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+  e.setUint32(12, size, true); e.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type });
+}
+const xmlEsc = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const colName = i => String.fromCharCode(65 + i);
+function sheetXml(rows, widths) {
+  const cell = (v, r, i) => {
+    const ref = colName(i) + r;
+    if (v == null || v === '') return '';
+    if (typeof v === 'object') return `<c r="${ref}" s="${v.s}"><v>${v.n}</v></c>`;
+    if (typeof v === 'number') return `<c r="${ref}"><v>${v}</v></c>`;
+    return `<c r="${ref}" t="inlineStr"${r === 1 ? ' s="1"' : ''}><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;
+  };
+  const body = rows.map((row, ri) => `<row r="${ri + 1}">${row.map((v, i) => cell(v, ri + 1, i)).join('')}</row>`).join('');
+  const last = colName(rows[0].length - 1) + rows.length;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${body}</sheetData><autoFilter ref="A1:${last}"/></worksheet>`;
+}
+function buildXlsx(entries) {
+  const serial = d => (d.getTime() - d.getTimezoneOffset() * 60000) / 86400000 + 25569;
+  const r1 = [['Дата', 'Время', 'Кто звонил', 'Телефон', 'Устройство', 'Номер', 'Место', 'Что просили', 'Угол, °', 'Что вернуть', 'Статус', 'Примечание']];
+  for (const e of entries) {
+    const d = new Date(e.ts), s = serial(d), c = callerOf(e);
+    r1.push([{ n: Math.floor(s), s: 2 }, { n: +(s - Math.floor(s)).toFixed(8), s: 3 }, c.name, fmtPhone(c.phone),
+      e.deviceType, e.device, e.location, e.action, e.angle, (e.open || e.restore) ? needText(e) : '',
+      isPending(e) ? 'ждёт возврата' : (e.closedBy ? 'возвращено' : ''), e.notes]);
+  }
+  const st = workerStats();
+  const r2 = [['Имя', 'Телефон', 'Примечание', 'Звонков']];
+  for (const w of [...aliveW()].sort((a, b) => a.name.localeCompare(b.name, 'ru'))) r2.push([w.name, fmtPhone(w.phone), w.note, (st.get(w.id) || { n: 0 }).n]);
+  const files = [
+    { name: '[Content_Types].xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+    { name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+    { name: 'xl/workbook.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Звонки" sheetId="1" r:id="rId1"/><sheet name="Работники" sheetId="2" r:id="rId2"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">\'Звонки\'!$A$1:$' + colName(r1[0].length - 1) + '$' + r1.length + '</definedName><definedName name="_xlnm._FilterDatabase" localSheetId="1" hidden="1">\'Работники\'!$A$1:$' + colName(r2[0].length - 1) + '$' + r2.length + '</definedName></definedNames></workbook>' },
+    { name: 'xl/_rels/workbook.xml.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+    { name: 'xl/styles.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd.mm.yyyy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="20" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' },
+    { name: 'xl/worksheets/sheet1.xml', data: sheetXml(r1, [12, 8, 24, 18, 16, 14, 18, 20, 9, 28, 15, 40]) },
+    { name: 'xl/worksheets/sheet2.xml', data: sheetXml(r2, [26, 18, 30, 10]) }
+  ];
+  return zipStore(files, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+$('btnXlsx').onclick = () => {
+  const range = $('xlRange').value, d0 = fromKey(viewDay);
+  let from = null, to = null, label = 'все';
+  if (range === 'day') { from = d0; to = new Date(d0); to.setDate(to.getDate() + 1); label = viewDay; }
+  else if (range === 'month') { from = new Date(d0.getFullYear(), d0.getMonth(), 1); to = new Date(d0.getFullYear(), d0.getMonth() + 1, 1); label = viewDay.slice(0, 7); }
+  const list = alive().filter(e => { const t = new Date(e.ts); return (!from || t >= from) && (!to || t < to); }).sort((a, b) => a.ts.localeCompare(b.ts));
+  if (!list.length) { toast('За этот период звонков нет', { error: true }); return; }
+  download(buildXlsx(list), 'Журнал-звонков-' + label + '.xlsx');
+  toast('Excel скачан: ' + calls(list.length));
+};
+
+/* ---------- форма звонка ---------- */
+let adding = null; // 'type' | 'action' — добавление своего пункта
+function lastUsedType() {
+  const e = [...alive()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return e ? e.deviceType : '';
+}
+function closeActionFor(e) {
+  const acts = state.settings.actions;
+  const order = e.restore && !e.open ? [RX_AUTO, RX_RUN] : [RX_RUN, RX_AUTO];
+  for (const rx of order) { const a = acts.find(x => rx.test(x)); if (a) return a; }
+  return '';
+}
+function pickHTML(kind, list, cur) {
+  const items = [...list]; if (cur && !items.includes(cur)) items.push(cur);
+  return items.map(v => `<button type="button" data-v="${esc(v)}" aria-pressed="${v === cur}">${esc(v)}</button>`).join('') +
+    (adding === kind
+      ? `<span class="own"><input id="own-${kind}" maxlength="40" placeholder="${kind === 'type' ? 'Своё устройство' : 'Своё действие'}" aria-label="${kind === 'type' ? 'Своё устройство' : 'Своё действие'}"><button type="button" class="own-ok" data-own="${kind}">Добавить</button></span>`
+      : `<button type="button" class="add-own" data-add="${kind}">+ Своё</button>`);
+}
+function renderPickers() {
+  $('pType').innerHTML = pickHTML('type', state.settings.deviceTypes, form.type);
+  $('pAction').innerHTML = pickHTML('action', state.settings.actions, form.action);
+}
+const syncAngle = () => { $('angleGroup').hidden = !(RX_ANGLE.test(form.action) || $('fAngle').value.trim() !== ''); renderSolar(); };
+const syncOrig = () => { $('origGroup').hidden = !$('fRestore').checked; };
+function applyType(v) { form.type = v; renderPickers(); fillDatalists(); }
+function applyAction(v) {
+  form.action = v;
+  if (!editingId && !linkingId) { $('fOpen').checked = RX_OPEN.test(v); $('fRestore').checked = RX_RESTORE.test(v); syncOrig(); }
+  renderPickers(); syncAngle();
+  if (!$('angleGroup').hidden) $('fAngle').focus();
+}
+function commitOwn(kind) {
+  const inp = $('own-' + kind), v = inp ? inp.value.trim() : '';
+  adding = null;
+  if (v) {
+    const key = kind === 'type' ? 'deviceTypes' : 'actions';
+    const exist = state.settings[key].find(x => x.toLowerCase() === v.toLowerCase());
+    const val = exist || v;
+    if (!exist) { state.settings[key].push(v); state.settings.updatedAt = new Date().toISOString(); persist(); toast('Добавлено в список: ' + v); }
+    if (kind === 'type') applyType(val); else applyAction(val);
+  } else renderPickers();
+}
+function onPick(kind, ev) {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.dataset.add) { adding = kind; renderPickers(); $('own-' + kind).focus(); return; }
+  if (b.dataset.own) { commitOwn(kind); return; }
+  if (b.dataset.v !== undefined) { if (adding) adding = null; kind === 'type' ? applyType(b.dataset.v) : applyAction(b.dataset.v); }
+}
+$('pType').onclick = ev => onPick('type', ev);
+$('pAction').onclick = ev => onPick('action', ev);
+$('composer').addEventListener('keydown', ev => {
+  const inp = ev.target.closest && ev.target.closest('.own input');
+  if (!inp) return;
+  const kind = inp.id.replace('own-', '');
+  if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); commitOwn(kind); }
+  else if (ev.key === 'Escape') { ev.stopPropagation(); adding = null; renderPickers(); }
+});
+$('fRestore').addEventListener('change', () => { syncOrig(); if ($('fRestore').checked) $('fOrig').focus(); });
+
+function uniqRecent(key, pred) {
+  const seen = new Set(), out = [];
+  for (const e of [...alive()].sort((a, b) => b.ts.localeCompare(a.ts))) {
+    if (pred && !pred(e)) continue;
+    const v = e[key];
+    if (v && !seen.has(v)) { seen.add(v); out.push(v); if (out.length >= 300) break; }
+  }
+  return out;
+}
+const opts = arr => arr.map(v => `<option value="${esc(v)}">`).join('');
+function fillDatalists() {
+  $('dlDev').innerHTML = opts(uniqRecent('device', e => e.deviceType === form.type));
+  $('dlLoc').innerHTML = opts(uniqRecent('location'));
+  $('dlOrig').innerHTML = opts([...new Set(['Авто', 'Авто, угол 0°', 'В работе', ...uniqRecent('origState')])]);
+}
+function setMode(mode) {
+  $('cTitle').textContent = { new: 'Новый звонок', edit: 'Изменить запись', return: 'Возврат устройства', repeat: 'Повторный звонок' }[mode];
+  $('btnCancelEdit').hidden = mode === 'new';
+  $('btnSave').textContent = mode === 'edit' ? 'Сохранить изменения' : 'Записать';
+}
+function resetComposer() {
+  editingId = null; linkingId = null; adding = null; setMode('new');
+  form.type = lastUsedType() || state.settings.deviceTypes[0] || '';
+  form.action = '';
+  clearWho();
+  ['fDev', 'fLoc', 'fAngle', 'fNotes', 'fOrig'].forEach(id => { $(id).value = ''; });
+  $('fTs').value = toLocalInput(new Date()); tsAuto = true;
+  $('fOpen').checked = false; $('fRestore').checked = false;
+  renderPickers(); syncAngle(); syncOrig(); fillDatalists();
+}
+function loadComposer(mode, src) {
+  resetComposer(); setMode(mode);
+  editingId = mode === 'edit' ? src.id : null;
+  linkingId = mode === 'return' ? src.id : null;
+  form.type = src.deviceType;
+  form.action = mode === 'return' ? closeActionFor(src) : src.action;
+  $('fDev').value = src.device; $('fLoc').value = src.location;
+  if (mode === 'return') {
+    if (src.restore && src.origState) {
+      const m = src.origState.match(/(-?\d+(?:[.,]\d+)?)\s*°/);
+      if (m) $('fAngle').value = m[1].replace('.', ',');
+      $('fNotes').value = 'Вернули в исходное: ' + src.origState;
+    }
+  } else {
+    if (src.angle != null) $('fAngle').value = fmtAngle(src.angle);
+    if (mode === 'edit') {
+      $('fNotes').value = src.notes;
+      $('fOpen').checked = src.open; $('fRestore').checked = src.restore; $('fOrig').value = src.origState;
+    } else { $('fOpen').checked = RX_OPEN.test(form.action); $('fRestore').checked = RX_RESTORE.test(form.action); }
+  }
+  $('fTs').value = toLocalInput(mode === 'edit' ? new Date(src.ts) : new Date());
+  tsAuto = mode !== 'edit';
+  const w = findW(src.workerId);
+  if (w && !w.deleted) selectWorker(w.id);
+  else if (src.callerName || src.callerPhone) $('fWho').value = src.callerName || fmtPhone(src.callerPhone);
+  renderPickers(); syncAngle(); syncOrig(); fillDatalists();
+  openComposer(mode === 'edit' ? $('fNotes') : (form.workerId ? (mode === 'return' ? $('btnSave') : $('fDev')) : $('fWho')));
+}
+function refreshTs() { if (tsAuto && !editingId) $('fTs').value = toLocalInput(new Date()); }
+$('fTs').addEventListener('input', () => { tsAuto = false; renderSolar(); });
+function openComposer(focusEl) {
+  refreshTs(); renderSolar();
+  if (mqMobile.matches) { $('composer').classList.add('open'); $('scrim').hidden = false; }
+  setTimeout(() => (focusEl || (form.workerId ? $('fDev') : $('fWho'))).focus(), mqMobile.matches ? 260 : 0);
+}
+function closeSheet() {
+  $('composer').classList.remove('open');
+  if ($('drawer').hidden) $('scrim').hidden = true;
+}
+$('fab').onclick = () => openComposer();
+$('btnSheetClose').onclick = closeSheet;
+$('btnCancelEdit').onclick = () => { resetComposer(); closeSheet(); };
+
+
+/* ---------- Солнце и угол трекера ---------- */
+// Положение солнца: алгоритм NOAA (Meeus), точность около 0,01°. Время берём в UTC, часовой пояс компьютера не важен.
+const RAD = Math.PI / 180;
+function sunPos(date, lat, lon) {
+  const jd = date.getTime() / 86400000 + 2440587.5, T = (jd - 2451545) / 36525;
+  const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
+  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+  const ecc = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+  const C = Math.sin(M * RAD) * (1.914602 - T * (0.004817 + 0.000014 * T)) + Math.sin(2 * M * RAD) * (0.019993 - 0.000101 * T) + Math.sin(3 * M * RAD) * 0.000289;
+  const om = 125.04 - 1934.136 * T;
+  const lam = L0 + C - 0.00569 - 0.00478 * Math.sin(om * RAD);
+  const eps = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60 + 0.00256 * Math.cos(om * RAD);
+  const decl = Math.asin(Math.sin(eps * RAD) * Math.sin(lam * RAD));
+  const y = Math.tan(eps * RAD / 2) ** 2;
+  const eot = 4 / RAD * (y * Math.sin(2 * L0 * RAD) - 2 * ecc * Math.sin(M * RAD) + 4 * ecc * y * Math.sin(M * RAD) * Math.cos(2 * L0 * RAD) - 0.5 * y * y * Math.sin(4 * L0 * RAD) - 1.25 * ecc * ecc * Math.sin(2 * M * RAD));
+  const utcMin = date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60 + date.getUTCMilliseconds() / 60000;
+  const H = ((((utcMin + eot + 4 * lon) / 4 - 180) + 180) % 360 + 360) % 360 - 180; // часовой угол, ° (после полудня > 0)
+  const phi = lat * RAD, h = H * RAD;
+  const el = Math.asin(Math.max(-1, Math.min(1, Math.sin(phi) * Math.sin(decl) + Math.cos(phi) * Math.cos(decl) * Math.cos(h))));
+  const azS = Math.atan2(Math.sin(h), Math.cos(h) * Math.sin(phi) - Math.tan(decl) * Math.cos(phi)); // от юга к западу
+  return { el: el / RAD, az: (azS / RAD + 180 + 360) % 360 }; // высота и азимут (0 = север, 90 = восток)
+}
+// Одноосный трекер, горизонтальная ось север-юг. θ > 0: стол наклонён на запад, θ < 0: на восток.
+function trackerAngle(p, site) {
+  const el = p.el * RAD, az = p.az * RAD;
+  const raw = Math.atan2(-Math.cos(el) * Math.sin(az), Math.sin(el)) / RAD;
+  let th = raw, bt = false;
+  if (site.gcr) {
+    const r = Math.cos(th * RAD) / site.gcr;
+    if (r < 1) { th -= Math.sign(th) * Math.acos(r) / RAD; bt = true; } // backtracking: cos(θист − θ) = cos(θист) / GCR
+  }
+  const lim = site.maxAngle, clipped = Math.abs(th) > lim;
+  return { raw, cmd: Math.max(-lim, Math.min(lim, th)), clipped, backtrack: bt };
+}
+function sunTimes(day0, site) {
+  const f = t => sunPos(new Date(t), site.lat, site.lon).el + 0.833; // 0,833° — стандартный учёт рефракции и диска солнца
+  const bis = (a, b) => { const sa = f(a) < 0; for (let i = 0; i < 24; i++) { const m = (a + b) / 2; if ((f(m) < 0) === sa) a = m; else b = m; } return new Date((a + b) / 2); };
+  const t0 = day0.getTime(), step = 600000;
+  let rise = null, set = null, prev = f(t0);
+  for (let t = t0 + step; t <= t0 + 86400000; t += step) {
+    const cur = f(t);
+    if (prev < 0 && cur >= 0 && !rise) rise = bis(t - step, t);
+    else if (prev >= 0 && cur < 0 && !set) set = bis(t - step, t);
+    prev = cur;
+  }
+  return { rise, set };
+}
+function renderSolar() {
+  const box = $('solar');
+  if (!box || $('angleGroup').hidden) return;
+  const site = state.settings.site;
+  const ts = $('fTs').value ? new Date($('fTs').value) : new Date();
+  if (isNaN(ts)) { box.innerHTML = ''; return; }
+  const p = sunPos(ts, site.lat, site.lon), tr = p.el > 0 ? trackerAngle(p, site) : null;
+  const st = sunTimes(new Date(ts.getFullYear(), ts.getMonth(), ts.getDate()), site);
+  const d = th => (site.westPositive ? th : -th);
+  const r1 = v => Math.round(v * 10) / 10;
+  const num = v => String(r1(v)).replace('.', ',');
+  const sg = v => (r1(v) > 0 ? '+' : r1(v) < 0 ? '−' : '') + num(Math.abs(v)) + '°';
+  const dir = th => (th > 0.5 ? 'к западу' : th < -0.5 ? 'к востоку' : 'горизонтально');
+  const when = hm(ts) + (dayKey(ts) !== todayKey() ? ', ' + shortDate(ts) : '');
+  let top;
+  if (tr) {
+    const notes = [];
+    if (tr.backtrack && !tr.clipped) notes.push('С учётом backtracking, прямо на солнце было бы ' + sg(d(tr.raw)) + '.');
+    else if (tr.clipped) notes.push('Упирается в предел ±' + num(site.maxAngle) + '°, прямо на солнце было бы ' + sg(d(tr.raw)) + '.');
+    top = `<div class="solar-top"><span class="solar-val">${sg(d(tr.cmd))}</span><span class="solar-dir">${dir(tr.cmd)}</span><button type="button" data-sa="${r1(d(tr.cmd))}">Подставить</button></div>
+      <div class="solar-sub">Солнце в ${when}: высота ${num(p.el)}°, азимут ${num(p.az)}°. ${notes.join(' ')}</div>`;
+  } else {
+    top = `<div class="solar-top"><span class="solar-dir">Солнце за горизонтом в ${when}</span></div>`;
+  }
+  const east = r1(d(-site.maxAngle)), west = r1(d(site.maxAngle));
+  box.innerHTML = top +
+    `<div class="solar-btns"><button type="button" data-sa="${east}">К восходу ${sg(d(-site.maxAngle))}</button><button type="button" data-sa="${west}">К закату ${sg(d(site.maxAngle))}</button>${tsAuto ? '' : '<button type="button" data-now>На текущее время</button>'}</div>
+     <div class="solar-sub">Восход ${st.rise ? hm(st.rise) : '—'}, закат ${st.set ? hm(st.set) : '—'}</div>` +
+    (site.set ? '' : '<div class="solar-sub"><b>Расчёт по координатам Ташкента.</b> <button type="button" class="link" data-site>Указать координаты станции</button></div>');
+}
+$('solar').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.sa !== undefined) { $('fAngle').value = b.dataset.sa.replace('.', ','); $('fAngle').focus(); }
+  else if ('now' in b.dataset) { tsAuto = true; refreshTs(); renderSolar(); }
+  else if ('site' in b.dataset) openDrawer('lists');
+});
+function fillSite() {
+  const s = state.settings.site;
+  $('sLat').value = String(s.lat); $('sLon').value = String(s.lon); $('sMax').value = String(s.maxAngle);
+  $('sGcr').value = s.gcr ? String(s.gcr).replace('.', ',') : ''; $('sSign').value = s.westPositive ? 'w' : 'e';
+}
+$('sLat').addEventListener('input', () => { // «41.31, 69.28» из Google Maps целиком
+  const m = $('sLat').value.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (m) { $('sLat').value = m[1]; $('sLon').value = m[2]; }
+});
+$('btnGeo').onclick = () => {
+  if (!navigator.geolocation) { toast('Это устройство не отдаёт координаты', { error: true }); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => { $('sLat').value = pos.coords.latitude.toFixed(5); $('sLon').value = pos.coords.longitude.toFixed(5); toast('Координаты подставлены. Нажми «Сохранить станцию»'); },
+    () => toast('Не удалось определить место. Введи координаты вручную', { error: true }),
+    { enableHighAccuracy: true, timeout: 15000 });
+};
+$('btnSaveSite').onclick = () => {
+  const num = id => parseFloat($(id).value.replace(',', '.'));
+  const lat = num('sLat'), lon = num('sLon'), mx = num('sMax'), g = $('sGcr').value.trim(), gcr = g === '' ? null : parseFloat(g.replace(',', '.'));
+  if (!isFinite(lat) || Math.abs(lat) > 90) { toast('Широта: число от -90 до 90', { error: true }); $('sLat').focus(); return; }
+  if (!isFinite(lon) || Math.abs(lon) > 180) { toast('Долгота: число от -180 до 180', { error: true }); $('sLon').focus(); return; }
+  if (!isFinite(mx) || mx < 10 || mx > 90) { toast('Предельный угол: от 10 до 90', { error: true }); $('sMax').focus(); return; }
+  if (gcr !== null && (!isFinite(gcr) || gcr < 0.1 || gcr > 0.95)) { toast('GCR: число от 0,1 до 0,95 или пусто', { error: true }); $('sGcr').focus(); return; }
+  state.settings = { ...state.settings, site: { lat, lon, maxAngle: mx, gcr, westPositive: $('sSign').value === 'w', set: true }, updatedAt: new Date().toISOString() };
+  persist(); renderSolar(); toast('Станция сохранена');
+};
+
+/* ---------- выбор работника ---------- */
+let whoItems = [], whoActive = -1;
+function clearWho() {
+  form.workerId = ''; form.newWorker = false;
+  $('fWho').value = ''; $('fWho').hidden = false;
+  $('whoChip').hidden = true; $('newWorker').hidden = true;
+  closeWhoList();
+}
+function selectWorker(id) {
+  const w = findW(id); if (!w) return;
+  form.workerId = id; form.newWorker = false;
+  $('whoChipText').innerHTML = `<b>${esc(w.name || 'Без имени')}</b>${w.phone ? `<small>${esc(fmtPhone(w.phone))}</small>` : ''}`;
+  $('whoChip').hidden = false; $('fWho').hidden = true; $('newWorker').hidden = true;
+  closeWhoList();
+}
+function startNewWorker(q) {
+  form.workerId = ''; form.newWorker = true;
+  const ph = isPhoneLike(q);
+  $('nwName').value = ph ? '' : q.trim();
+  $('nwPhone').value = ph && maskUz(q).local ? maskUz(q).text : '';
+  $('fWho').hidden = true; $('whoChip').hidden = true; $('newWorker').hidden = false;
+  closeWhoList();
+  (ph ? $('nwName') : $('nwPhone')).focus();
+}
+function whoMatches(q) {
+  const t = q.trim().toLowerCase(), digits = q.replace(/\D/g, ''), st = workerStats();
+  return aliveW()
+    .filter(w => !t || w.name.toLowerCase().includes(t) || (digits.length >= 2 && w.phone.includes(digits)))
+    .sort((a, b) => ((st.get(b.id) || {}).last || '').localeCompare((st.get(a.id) || {}).last || '') || a.name.localeCompare(b.name, 'ru'))
+    .slice(0, 8);
+}
+function drawWho() {
+  $('whoList').innerHTML = whoItems.map((it, i) => it.w
+    ? `<div class="opt${i === whoActive ? ' active' : ''}" role="option" data-i="${i}"><b>${esc(it.w.name || 'Без имени')}</b><small>${esc(fmtPhone(it.w.phone))}</small></div>`
+    : `<div class="opt add${i === whoActive ? ' active' : ''}" role="option" data-i="${i}">Добавить в базу: «${esc(it.add)}»</div>`).join('');
+}
+function renderWhoList() {
+  const q = $('fWho').value, qt = q.trim(), p = normPhone(qt);
+  const matches = whoMatches(q);
+  whoItems = matches.map(w => ({ w }));
+  if (qt && !matches.some(w => w.name.toLowerCase() === qt.toLowerCase() || (p.length >= 7 && w.phone === p))) whoItems.push({ add: qt });
+  if (!whoItems.length) { closeWhoList(); return; }
+  whoActive = qt ? 0 : -1;
+  drawWho();
+  $('whoList').hidden = false; $('fWho').setAttribute('aria-expanded', 'true');
+}
+function closeWhoList() { $('whoList').hidden = true; $('fWho').setAttribute('aria-expanded', 'false'); whoActive = -1; }
+function chooseWho(i) { const it = whoItems[i]; if (!it) return; if (it.w) { selectWorker(it.w.id); $('fDev').focus(); } else startNewWorker(it.add); }
+$('fWho').addEventListener('input', renderWhoList);
+$('fWho').addEventListener('focus', renderWhoList);
+$('fWho').addEventListener('blur', () => setTimeout(closeWhoList, 120));
+$('fWho').addEventListener('keydown', e => {
+  if ($('whoList').hidden) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    whoActive = (whoActive + (e.key === 'ArrowDown' ? 1 : -1) + whoItems.length) % whoItems.length;
+    drawWho();
+  } else if (e.key === 'Enter' && whoActive >= 0 && !e.ctrlKey && !e.metaKey) { e.preventDefault(); chooseWho(whoActive); }
+  else if (e.key === 'Escape') { e.stopPropagation(); closeWhoList(); }
+});
+$('whoList').addEventListener('mousedown', e => e.preventDefault());
+$('whoList').addEventListener('click', e => { const o = e.target.closest('[data-i]'); if (o) chooseWho(+o.dataset.i); });
+$('whoClear').onclick = () => { clearWho(); $('fWho').focus(); };
+$('nwCancel').onclick = () => { clearWho(); $('fWho').focus(); };
+
+function resolveCaller() {
+  if (form.workerId) return { w: findW(form.workerId) };
+  let name = '', phone = '';
+  if (form.newWorker) {
+    const ph = phoneFrom($('nwPhone'));
+    if (ph.bad) { $('nwPhone').focus(); return { error: PHONE_BAD }; }
+    name = $('nwName').value.trim(); phone = ph.phone;
+    if (!name && !phone) return { error: 'Укажи имя или телефон работника' };
+  } else {
+    const q = $('fWho').value.trim();
+    if (!q) return { w: null };
+    const p = normPhone(q);
+    const byPhone = p.length >= 7 && aliveW().find(w => w.phone === p);
+    if (byPhone) return { w: byPhone };
+    const byName = aliveW().filter(w => w.name.toLowerCase() === q.toLowerCase());
+    if (byName.length === 1) return { w: byName[0] };
+    if (isPhoneLike(q)) { if (p.length !== 12 || !p.startsWith('998')) return { error: PHONE_BAD }; phone = p; } else name = q;
+  }
+  const dup = phone && aliveW().find(w => w.phone === phone);
+  if (dup) return { w: dup, note: 'Номер уже есть в базе: ' + (dup.name || fmtPhone(dup.phone)) };
+  const now = new Date().toISOString();
+  const w = { id: uid(), name, phone, note: '', createdAt: now, updatedAt: now, deleted: false };
+  state.workers.push(w);
+  return { w, added: true };
+}
+
+function saveEntry() {
+  if (adding) commitOwn(adding);
+  if (!form.action) { toast('Выбери, что просили', { error: true }); return; }
+  const device = $('fDev').value.trim(), location = $('fLoc').value.trim();
+  if (!device && !location) { toast('Укажи номер устройства или место', { error: true }); $('fDev').focus(); return; }
+  const rawA = $('fAngle').value.trim().replace(',', '.');
+  const angle = rawA === '' ? null : Number(rawA);
+  if (angle !== null && (!isFinite(angle) || Math.abs(angle) > 90)) { toast('Угол: число от -90 до 90', { error: true }); $('fAngle').focus(); return; }
+  const tsIso = (tsAuto && !editingId) || !$('fTs').value ? new Date().toISOString() : new Date($('fTs').value).toISOString();
+  if (new Date(tsIso) - Date.now() > 10 * 60000) { toast('Время звонка в будущем. Проверь дату и время', { error: true }); $('fTs').focus(); return; }
+  const r = resolveCaller();
+  if (r.error) { toast(r.error, { error: true }); return; }
+  const now = new Date().toISOString(), w = r.w, restore = $('fRestore').checked;
+  const data = {
+    ts: tsIso,
+    workerId: w ? w.id : '', callerName: w ? w.name : '', callerPhone: w ? w.phone : '',
+    deviceType: form.type, location, device, action: form.action, angle,
+    open: $('fOpen').checked, restore, origState: restore ? $('fOrig').value.trim() : '',
+    notes: $('fNotes').value.trim(), updatedAt: now
+  };
+  const wasEdit = !!editingId;
+  let id = editingId;
+  if (wasEdit) { const en = find(editingId); if (en) Object.assign(en, data); }
+  else {
+    id = uid();
+    state.entries.push({ id, createdAt: now, linkedTo: linkingId || '', closedBy: '', deleted: false, ...data });
+    const orig = linkingId && find(linkingId);
+    if (orig) { orig.closedBy = id; orig.updatedAt = now; }
+  }
+  persist();
+  viewDay = dayKey(new Date(data.ts));
+  resetComposer(); closeSheet(); render(); flash(id);
+  toast(r.note || (wasEdit ? 'Изменения сохранены' : r.added ? 'Записано, работник добавлен в базу' : 'Записано'));
+}
+$('form').addEventListener('submit', e => { e.preventDefault(); saveEntry(); });
+
+/* ---------- день ---------- */
+function stateHTML(e, byId) {
+  if (isPending(e)) return `<span class="c-state open">${esc(needText(e))}</span>`;
+  if (e.closedBy && (e.open || e.restore)) {
+    const c = byId.get(e.closedBy);
+    const what = e.restore && !e.open ? 'Возвращено в исходное' : 'Запущено';
+    return `<span class="c-state done">${what}${c && !c.deleted ? ' в ' + hm(new Date(c.ts)) : ''}</span>`;
+  }
+  if (e.linkedTo) {
+    const o = byId.get(e.linkedTo);
+    if (o) return `<span class="c-state link">После «${esc(o.action)}» в ${hm(new Date(o.ts))}${dayKey(new Date(o.ts)) !== dayKey(new Date(e.ts)) ? ', ' + shortDate(new Date(o.ts)) : ''}</span>`;
+  }
+  return '';
+}
+const HUES = [192, 28, 262, 140, 335, 215, 55, 0, 100, 300];
+const typeHue = t => { const i = state.settings.deviceTypes.indexOf(t); return i >= 0 ? HUES[i % HUES.length] : hue(t); };
+const tag = t => t ? `<span class="tag" style="--h:${typeHue(t)}">${esc(t)}</span>` : '';
+const whatText = e => `${tag(e.deviceType)}<b>${esc(e.device || e.location || '—')}</b>${e.device && e.location ? ', ' + esc(e.location) : ''}. ${esc(e.action)}${e.angle != null ? ', угол ' + fmtAngle(e.angle) + '°' : ''}`;
+function callHTML(e, byId) {
+  const c = callerOf(e), pending = isPending(e);
+  const who = c.name || c.phone
+    ? `<b>${esc(c.name || fmtPhone(c.phone))}</b>${c.name && c.phone ? `<a href="tel:+${esc(c.phone)}">${esc(fmtPhone(c.phone))}</a>` : ''}`
+    : '<span class="muted">Звонивший не указан</span>';
+  return `<li class="call${pending ? ' is-open' : ''}" data-id="${esc(e.id)}">
+    <time class="c-time" datetime="${esc(e.ts)}">${hm(new Date(e.ts))}</time><span class="c-dot"></span>
+    <div class="c-body">
+      <div class="c-who">${who}</div>
+      <div class="c-what">${whatText(e)}</div>
+      ${stateHTML(e, byId)}
+      ${e.notes ? `<p class="c-notes">${esc(e.notes)}</p>` : ''}
+      <div class="c-acts">
+        ${pending ? '<button type="button" class="ret" data-act="return">Вернуть</button>' : ''}
+        <button type="button" data-act="repeat">Повторить</button>
+        <button type="button" data-act="edit">Изменить</button>
+        <button type="button" class="del" data-act="del">Удалить</button>
+      </div>
+    </div></li>`;
+}
+function render() {
+  const all = alive(), byId = new Map(state.entries.map(e => [e.id, e]));
+  const d0 = fromKey(viewDay), d1 = new Date(d0); d1.setDate(d1.getDate() + 1);
+  const day = all.filter(e => { const t = new Date(e.ts); return t >= d0 && t < d1; }).sort((a, b) => b.ts.localeCompare(a.ts));
+  const isToday = viewDay === todayKey();
+
+  $('dayTitle').textContent = longDate(d0);
+  $('daySub').textContent = (isToday ? 'Сегодня, ' : '') + (day.length ? calls(day.length) : 'звонков нет');
+  $('nextDay').disabled = viewDay >= todayKey();
+  $('btnToday').hidden = isToday;
+  $('dayPick').value = viewDay;
+  $('dayPick').max = todayKey();
+
+  // лента суток
+  const pct = t => ((t.getHours() * 60 + t.getMinutes()) / 1440 * 100).toFixed(3) + '%';
+  $('tapeTrack').innerHTML = day.map(e => {
+    const t = new Date(e.ts), c = callerOf(e);
+    return `<button type="button" class="mk${isPending(e) ? ' open' : ''}" style="left:${pct(t)}" data-goto="${esc(e.id)}" title="${esc(hm(t) + ' ' + (c.name || '') + ': ' + (e.device || e.location) + ', ' + e.action)}" aria-label="${esc(hm(t) + ', ' + (e.device || e.location))}"></button>`;
+  }).join('') + (isToday ? `<span class="now" style="left:${pct(new Date())}"></span>` : '');
+  $('tapeHours').innerHTML = [0, 3, 6, 9, 12, 15, 18, 21].map(h => `<span${h % 6 ? ' class="minor"' : ''} style="left:${h / 24 * 100}%">${pad(h)}:00</span>`).join('');
+
+  // ожидают возврата (за все дни)
+  const open = all.filter(isPending).sort((a, b) => a.ts.localeCompare(b.ts));
+  $('waiting').hidden = !open.length;
+  $('waitTitle').textContent = 'Ожидают возврата: ' + open.length;
+  $('waitList').innerHTML = open.map(e => {
+    const c = callerOf(e);
+    return `<div class="w-item" data-id="${esc(e.id)}">
+      <button type="button" class="what" data-goto="${esc(e.id)}">${whatText(e)}${c.name ? '. Звонил ' + esc(c.name) : ''}<span class="need">${esc(needText(e))}</span></button>
+      <span class="ago" title="${esc(new Date(e.ts).toLocaleString('ru-RU'))}">${fmtAgo(e.ts)}</span>
+      <button type="button" class="btn-return" data-act="return">Вернуть</button></div>`;
+  }).join('');
+
+  // звонки дня
+  $('calls').innerHTML = day.map(e => callHTML(e, byId)).join('');
+  $('empty').hidden = !!day.length;
+  if (!day.length) {
+    const prev = all.filter(e => new Date(e.ts) < d0).sort((a, b) => b.ts.localeCompare(a.ts))[0];
+    $('empty').innerHTML = (isToday && !all.length
+      ? 'Здесь появятся звонки с поля. Заполни форму и нажми «Записать».'
+      : 'За этот день звонков не записано.') +
+      (prev ? `<br><button type="button" class="ghost" data-day="${dayKey(new Date(prev.ts))}">Перейти к ${esc(shortDate(new Date(prev.ts)))}, последний день со звонками</button>` : '');
+  }
+}
+function goToDay(k, flashId) { viewDay = k > todayKey() ? todayKey() : k; render(); if (flashId) flash(flashId); }
+function shiftDay(n) { const d = fromKey(viewDay); d.setDate(d.getDate() + n); goToDay(dayKey(d)); }
+function flash(id) {
+  const el = [...document.querySelectorAll('.call')].find(x => x.dataset.id === id);
+  if (!el) return;
+  if (el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+$('prevDay').onclick = () => shiftDay(-1);
+$('nextDay').onclick = () => shiftDay(1);
+$('btnToday').onclick = () => goToDay(todayKey());
+$('dayPick').onchange = () => { if ($('dayPick').value) goToDay($('dayPick').value); };
+
+function deleteEntry(e) {
+  const now = new Date().toISOString();
+  e.deleted = true; e.updatedAt = now;
+  const orig = e.linkedTo && find(e.linkedTo);
+  const reopened = orig && orig.closedBy === e.id;
+  if (reopened) { orig.closedBy = ''; orig.updatedAt = now; }
+  persist(); render();
+  toast('Запись удалена', { action: { label: 'Отменить', fn: () => {
+    const t = new Date().toISOString();
+    e.deleted = false; e.updatedAt = t;
+    if (reopened && !orig.closedBy) { orig.closedBy = e.id; orig.updatedAt = t; }
+    persist(); render(); flash(e.id);
+  } } });
+}
+document.addEventListener('click', ev => {
+  const g = ev.target.closest('[data-goto]');
+  if (g) { const e = find(g.dataset.goto); if (e) { if (!$('drawer').hidden) closeDrawer(); goToDay(dayKey(new Date(e.ts)), e.id); } return; }
+  const dbtn = ev.target.closest('[data-day]');
+  if (dbtn) { goToDay(dbtn.dataset.day); return; }
+  const a = ev.target.closest('[data-act]');
+  if (!a) return;
+  const row = a.closest('[data-id]'), e = row && find(row.dataset.id);
+  if (!e) return;
+  const act = a.dataset.act;
+  if (act === 'return') loadComposer('return', e);
+  else if (act === 'repeat') loadComposer('repeat', e);
+  else if (act === 'edit') loadComposer('edit', e);
+  else if (act === 'del') deleteEntry(e);
+});
+
+/* ---------- меню ---------- */
+let curTab = 'workers', wEditing = null, wOpen = null;
+function openDrawer(tab) {
+  closeSheet();
+  if (tab) curTab = tab;
+  $('drawer').hidden = false; $('scrim').hidden = false;
+  renderDrawer();
+}
+function closeDrawer() {
+  $('drawer').hidden = true;
+  if (!$('composer').classList.contains('open')) $('scrim').hidden = true;
+}
+function renderDrawer() {
+  if ($('drawer').hidden) return;
+  document.querySelectorAll('.tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === curTab));
+  ['workers', 'data', 'lists'].forEach(t => { $('tab-' + t).hidden = t !== curTab; });
+  if (curTab === 'workers') renderWorkers();
+  if (curTab === 'data') { updateFileUI(); renderBackupState(); renderGhSection(); }
+  if (curTab === 'lists') { $('sTypes').value = state.settings.deviceTypes.join('\n'); $('sActions').value = state.settings.actions.join('\n'); fillSite(); }
+}
+$('btnMenu').onclick = () => openDrawer();
+$('drawerClose').onclick = closeDrawer;
+$('scrim').onclick = () => { closeDrawer(); closeSheet(); };
+document.querySelector('.tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { curTab = b.dataset.tab; renderDrawer(); } };
+
+/* работники */
+function renderWorkers() {
+  const q = $('wFilter').value.trim().toLowerCase(), qd = q.replace(/\D/g, ''), st = workerStats();
+  const ws = aliveW()
+    .filter(w => !q || w.name.toLowerCase().includes(q) || (qd.length >= 2 && w.phone.includes(qd)) || w.note.toLowerCase().includes(q))
+    .sort((a, b) => ((st.get(b.id) || {}).last || '').localeCompare((st.get(a.id) || {}).last || '') || a.name.localeCompare(b.name, 'ru'));
+  if (!ws.length) {
+    $('wList').innerHTML = `<p class="note" style="margin-top:8px">${aliveW().length ? 'Никого не нашлось.' : 'База пуста. Добавь работника выше или прямо в форме звонка: впиши имя или номер и выбери «Добавить в базу».'}</p>`;
+    return;
+  }
+  $('wList').innerHTML = ws.map(w => {
+    const s = st.get(w.id);
+    const meta = s ? calls(s.n) + ', последний ' + shortDate(new Date(s.last)) + ' в ' + hm(new Date(s.last)) : 'Звонков пока нет';
+    let list = '';
+    if (wOpen === w.id) {
+      const items = alive().filter(e => e.workerId === w.id).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 15);
+      list = items.length ? `<ul class="w-calls">${items.map(e => `<li><button type="button" data-goto="${esc(e.id)}"><time>${esc(shortDate(new Date(e.ts)))}, ${hm(new Date(e.ts))}</time>${esc(e.device || e.location)}: ${esc(e.action)}</button></li>`).join('')}</ul>` : '';
+    }
+    return `<div class="w-row" data-wid="${esc(w.id)}">
+      <div class="w-name">${esc(w.name || 'Без имени')}</div>
+      ${w.phone ? `<a href="tel:+${esc(w.phone)}">${esc(fmtPhone(w.phone))}</a>` : ''}
+      ${w.note ? `<div class="w-meta">${esc(w.note)}</div>` : ''}
+      <div class="w-meta">${meta}</div>
+      <div class="w-acts">${s ? `<button type="button" data-wact="calls">${wOpen === w.id ? 'Скрыть звонки' : 'Звонки'}</button>` : ''}<button type="button" data-wact="edit">Изменить</button><button type="button" class="del" data-wact="del">Удалить</button></div>
+      ${list}</div>`;
+  }).join('');
+}
+function resetWForm() {
+  wEditing = null;
+  ['wName', 'wPhone', 'wNote'].forEach(id => { $(id).value = ''; });
+  $('wPhone').dataset.mask = '';
+  $('wFormTitle').textContent = 'Добавить работника';
+  $('wCancel').hidden = true;
+}
+$('wFilter').addEventListener('input', renderWorkers);
+$('wCancel').onclick = resetWForm;
+$('wForm').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const name = $('wName').value.trim(), ph = phoneFrom($('wPhone')), phone = ph.phone;
+  if (ph.bad) { toast(PHONE_BAD, { error: true }); $('wPhone').focus(); return; }
+  if (!name && !phone) { toast('Укажи имя или телефон', { error: true }); $('wName').focus(); return; }
+  const dup = phone && aliveW().find(w => w.phone === phone && w.id !== wEditing);
+  if (dup) { toast('Этот номер уже у: ' + (dup.name || fmtPhone(dup.phone)), { error: true }); $('wPhone').focus(); return; }
+  const now = new Date().toISOString();
+  const data = { name, phone, note: $('wNote').value.trim(), updatedAt: now };
+  const wasEdit = !!wEditing;
+  if (wasEdit) Object.assign(findW(wEditing), data);
+  else state.workers.push({ id: uid(), createdAt: now, deleted: false, ...data });
+  if (wasEdit && form.workerId === wEditing) selectWorker(wEditing);
+  resetWForm(); persist(); render(); renderWorkers();
+  toast(wasEdit ? 'Данные работника сохранены' : 'Работник добавлен');
+});
+$('wList').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-wact]'); if (!b) return;
+  const w = findW(b.closest('[data-wid]').dataset.wid); if (!w) return;
+  const act = b.dataset.wact;
+  if (act === 'calls') { wOpen = wOpen === w.id ? null : w.id; renderWorkers(); }
+  else if (act === 'edit') {
+    wEditing = w.id;
+    $('wName').value = w.name; $('wPhone').value = fmtPhone(w.phone); $('wNote').value = w.note;
+    $('wPhone').dataset.mask = w.phone && !w.phone.startsWith('998') ? 'off' : '';
+    $('wFormTitle').textContent = 'Изменить работника'; $('wCancel').hidden = false;
+    $('tab-workers').scrollTop = 0; $('wName').focus();
+  } else if (act === 'del') {
+    if (!confirm('Удалить «' + (w.name || fmtPhone(w.phone)) + '» из базы? Его звонки в журнале останутся.')) return;
+    const now = new Date().toISOString();
+    for (const e of state.entries) if (e.workerId === w.id) { e.callerName = w.name; e.callerPhone = w.phone; e.updatedAt = now; }
+    w.deleted = true; w.updatedAt = now;
+    if (form.workerId === w.id) clearWho();
+    if (wEditing === w.id) resetWForm();
+    persist(); render(); renderWorkers();
+    toast('Работник удалён из базы');
+  }
+});
+
+/* списки */
+$('btnResetLists').onclick = () => { $('sTypes').value = DEFAULTS.deviceTypes.join('\n'); $('sActions').value = DEFAULTS.actions.join('\n'); };
+$('btnSaveLists').onclick = () => {
+  const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean);
+  state.settings = normSettings({ deviceTypes: lines('sTypes'), actions: lines('sActions'), site: state.settings.site, updatedAt: new Date().toISOString() });
+  persist(); renderPickers(); render();
+  toast('Списки сохранены');
+};
+
+/* ---------- клавиатура ---------- */
+document.addEventListener('keydown', e => {
+  if (!$('loader').hidden || !$('passDlg').hidden) return;
+  if (e.key === 'Escape') {
+    if (!$('drawer').hidden) { closeDrawer(); return; }
+    if ($('composer').classList.contains('open')) { closeSheet(); return; }
+    if (editingId || linkingId) { resetComposer(); return; }
+  }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && $('composer').contains(document.activeElement)) { e.preventDefault(); saveEntry(); return; }
+  const tagName = (document.activeElement && document.activeElement.tagName) || '';
+  if (/INPUT|TEXTAREA|SELECT/.test(tagName) || e.ctrlKey || e.metaKey || e.altKey || !$('drawer').hidden) return;
+  if (['n', 'N', 'т', 'Т'].includes(e.key)) { e.preventDefault(); openComposer(); }
+  else if (e.key === 'ArrowLeft') shiftDay(-1);
+  else if (e.key === 'ArrowRight' && viewDay < todayKey()) shiftDay(1);
+});
+
+// Если журнал открыт в двух вкладках, запись из одной сразу появляется в другой и не затирается.
+window.addEventListener('storage', e => {
+  if (e.key !== LS_KEY || !e.newValue) return;
+  try { absorb(parseData(JSON.parse(e.newValue))); renderPickers(); render(); renderDrawer(); renderSolar(); writeFile(); } catch (err) { console.warn(err); }
+});
+
+window.addEventListener('online', () => { if (ghReady() && !gh.halted) ghRun(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && ghReady() && !gh.halted && !gh.running) ghRun(); });
+window.addEventListener('beforeunload', e => { if (ghReady() && (gh.dirty || gh.running)) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- старт ---------- */
+(async function init() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) absorb(parseData(JSON.parse(raw)));
+    else { const old = localStorage.getItem(LS_OLD); if (old) absorb(parseData(JSON.parse(old))); }
+  } catch (e) { console.warn(e); }
+  ghLoadCfg(); resetComposer(); updateFileUI(); render(); renderGhSection();
+  setInterval(() => { // «сколько прошло», линия текущего времени и время в форме
+    if (document.hidden) return;
+    render();
+    if (document.activeElement !== $('fTs')) refreshTs();
+    renderSolar();
+    if (ghReady() && !gh.halted && !gh.running) ghRun(); // раз в минуту забираем записи других диспетчеров
+  }, 60000);
+  (async () => {
+    if (ghLegacy) {
+      const ok = await passDialog('set', async p => saveGhCfg(await sealToken(ghToken, p, gh.cfg)));
+      toast(ok ? 'Токен зашифрован' : 'Токен работает до закрытия страницы');
+    }
+    if (ghReady()) ghLoad(); else if (gh.cfg) ghUnlock();
+  })();
+  if (!FS_OK) return;
+  try {
+    const h = await idb('readonly', s => s.get('handle'));
+    if (!h) return;
+    if (await h.queryPermission({ mode: 'readwrite' }) === 'granted') await connect(h);
+    else { pendingHandle = h; updateFileUI(); }
+  } catch (e) { console.error(e); }
+})();
+</script>
 </body>
 </html>
