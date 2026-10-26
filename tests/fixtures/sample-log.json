@@ -1,0 +1,60 @@
+{
+  "app": "scada-log",
+  "version": 4,
+  "savedAt": "2026-10-13T05:52:54.305Z",
+  "settings": {
+    "deviceTypes": [
+      "TCU",
+      "Трансформатор",
+      "Инвертор",
+      "DC-бокс",
+      "Панель / стринг",
+      "Другое"
+    ],
+    "actions": [
+      "Остановка",
+      "Запуск",
+      "Ручной режим",
+      "Изменение угла",
+      "Возврат в авто",
+      "Сброс аварии",
+      "Справка / проверка",
+      "Другое"
+    ],
+    "updatedAt": ""
+  },
+  "workers": [
+    {
+      "id": "mv69le744nbao",
+      "name": "Рабочий",
+      "phone": "998901234500",
+      "note": "",
+      "createdAt": "2026-10-13T05:52:54.304Z",
+      "updatedAt": "2026-10-13T05:52:54.304Z",
+      "deleted": false
+    }
+  ],
+  "entries": [
+    {
+      "id": "mv69kgbs88dbv",
+      "createdAt": "2026-10-13T05:52:10.408Z",
+      "linkedTo": "",
+      "closedBy": "",
+      "deleted": false,
+      "ts": "2026-10-13T05:50:00.000Z",
+      "workerId": "mv69le744nbao",
+      "callerName": "Рабочий",
+      "callerPhone": "998901234500",
+      "deviceType": "TCU",
+      "location": "30",
+      "device": "101-106",
+      "action": "Изменение угла",
+      "angle": 40,
+      "open": false,
+      "restore": false,
+      "origState": "",
+      "notes": "",
+      "updatedAt": "2026-10-13T05:52:54.304Z"
+    }
+  ]
+}
