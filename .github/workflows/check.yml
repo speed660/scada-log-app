@@ -1,0 +1,30 @@
+name: Проверка
+
+# Запускает все проверки в браузере при каждом коммите в main и при каждом pull request.
+# Если проверка красная, значит в index.html что-то сломано: смотрите журнал запуска во вкладке Actions.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Установка Playwright и Chromium
+        run: |
+          pip install playwright==1.56.0
+          python -m playwright install --with-deps chromium
+      - name: Проверки
+        run: python tests/run_all.py
