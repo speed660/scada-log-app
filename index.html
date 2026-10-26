@@ -138,12 +138,24 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .solar-top button[data-sa]{background:var(--sun);color:#fff;border-color:var(--sun)}
 @media (prefers-color-scheme:dark){.solar-top button[data-sa]{color:#2a1c00}}
 
+/* сверка угла */
+.cal{margin-top:12px;font-size:13.5px}
+.cal table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.cal th,.cal td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+.cal th:first-child,.cal td:first-child{text-align:left}
+.cal th{font-size:12px;font-weight:600;color:var(--muted)}
+.cal .bad{color:var(--danger);font-weight:650}
+.cal .ok{color:var(--ok);font-weight:650}
+.cal .sum{margin:10px 0 0;line-height:1.5}
+.cal .x{min-height:28px;padding:0 6px;color:var(--muted)}
+
 /* лента суток */
 .tape{margin:22px 0 6px}
 .tape-track{position:relative;height:46px;background-color:var(--panel);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;
   background-image:linear-gradient(to right,var(--soft) 1px,transparent 1px);background-size:calc(100% / 24) 100%}
 .mk{position:absolute;top:9px;bottom:9px;width:5px;margin-left:-2px;border-radius:3px;background:var(--teal);transition:top .12s,bottom .12s}
 .mk.open{background:var(--sun)}
+.mk.late{background:var(--danger)}
 .mk:hover,.mk:focus-visible{top:4px;bottom:4px}
 .now{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--danger);opacity:.55;pointer-events:none}
 .tape-hours{position:relative;height:20px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -172,6 +184,14 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .c-time{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;line-height:1.35}
 .c-dot{width:14px;height:14px;border-radius:50%;background:var(--paper);border:3px solid var(--teal);margin:4px auto 0;position:relative;z-index:1}
 .call.is-open .c-dot{border-color:var(--sun);background:var(--sun)}
+.call.late .c-dot{border-color:var(--danger);background:var(--danger)}
+.c-meta{font-size:12.5px;color:var(--muted);margin-top:4px}
+.c-hist{margin-top:4px;font-size:12.5px;color:var(--muted)}
+.c-hist summary{cursor:pointer;width:fit-content}
+.c-hist ul{list-style:none;margin:4px 0 0;padding:6px 10px;border-left:2px solid var(--line);display:grid;gap:3px;overflow-wrap:anywhere}
+.c-state.late{color:var(--danger)}
+.waiting.has-late{border-left-color:var(--danger)}
+.w-item.late .ago{color:var(--danger);font-weight:650}
 .c-body{min-width:0}
 .c-who{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;line-height:1.35}
 .c-who b{font-size:16px}
@@ -300,6 +320,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
         <div class="orig" id="origGroup" hidden><input id="fOrig" list="dlOrig" placeholder="Каким было: авто, угол 0°…" aria-label="Исходное состояние"></div>
       </div>
       <div class="field"><label for="fNotes">Примечание</label><textarea id="fNotes" rows="2" placeholder="Причина, детали"></textarea></div>
+      <div class="field"><label for="fBy">Диспетчер, кто записывает</label><input id="fBy" list="dlBy" placeholder="Ваше имя" autocomplete="off" maxlength="60"></div>
       <button type="submit" class="primary" id="btnSave">Записать</button>
       <p class="hint">Ctrl+Enter, чтобы записать</p>
     </form>
@@ -419,6 +440,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
       <h3>Списки для формы</h3>
       <div class="field"><label for="sTypes">Устройства, по одному на строку</label><textarea id="sTypes" rows="7"></textarea></div>
       <div class="field"><label for="sActions">Что просят, по одному на строку</label><textarea id="sActions" rows="9"></textarea></div>
+      <div class="field"><label for="sAlert">Подсвечивать красным, если возврата ждут дольше, ч</label><input id="sAlert" inputmode="decimal" placeholder="2"><p class="note" style="margin-top:6px">0 отключает подсветку.</p></div>
       <p class="note">«Ручной», «угол» и «наклон» сразу ставят отметку «вернуть в исходное», а «угол» и «наклон» ещё открывают поле угла. Новые пункты можно добавлять и прямо в форме кнопкой «+ Своё».</p>
       <div class="btn-row">
         <button type="button" class="ghost" id="btnResetLists">Вернуть стандартные</button>
@@ -437,9 +459,20 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
         <div class="field"><label for="sMax">Предельный угол трекера, °</label><input id="sMax" inputmode="decimal" placeholder="60"></div>
         <div class="field"><label for="sGcr">GCR (необязательно)</label><input id="sGcr" inputmode="decimal" placeholder="0,35"></div>
       </div>
+      <div class="field"><label for="sSkew">Поворот рядов от линии север–юг, °</label><input id="sSkew" inputmode="decimal" placeholder="0"></div>
       <div class="field"><label for="sSign">Знак угла в SCADA</label><select id="sSign"><option value="w">+ на запад, − на восток</option><option value="e">+ на восток, − на запад</option></select></div>
-      <p class="note">GCR: ширина стола, делённая на расстояние между рядами. Если указать, расчёт учтёт backtracking (утром и вечером стол выравнивается, чтобы ряды не затеняли друг друга). Если на станции backtracking выключен, оставь пустым. Предел угла и знак возьми из паспорта трекера или с экрана SCADA.</p>
+      <p class="note">Поворот рядов: на сколько градусов ось трекера отклонена от линии север–юг (по часовой стрелке, если смотреть сверху). Если ряды идут строго север–юг, оставь 0. GCR: ширина стола, делённая на расстояние между рядами. Если указать, расчёт учтёт backtracking (утром и вечером стол выравнивается, чтобы ряды не затеняли друг друга). Если на станции backtracking выключен, оставь пустым. Предел угла и знак возьми из паспорта трекера или с экрана SCADA.</p>
       <div class="btn-row"><button type="button" class="primary" id="btnSaveSite">Сохранить станцию</button></div>
+    </section>
+    <section>
+      <h3>Сверка угла со SCADA</h3>
+      <p class="note">Чтобы проверить расчёт, добавьте несколько точек: время и угол, который в этот момент показывала SCADA. Лучше 3–4 точки в разное время дня, в том числе утром или вечером. Станция должна быть сохранена выше. Точки хранятся только в этом браузере.</p>
+      <div class="row2">
+        <div class="field"><label for="cTime">Время</label><input id="cTime" type="datetime-local"></div>
+        <div class="field"><label for="cAngle">Угол в SCADA, °</label><input id="cAngle" inputmode="decimal" placeholder="-24,5"></div>
+      </div>
+      <div class="btn-row"><button type="button" class="primary" id="btnCalAdd">Добавить точку</button><button type="button" class="ghost" id="btnCalFit">Подобрать поворот рядов</button><button type="button" class="ghost" id="btnCalClear">Очистить</button></div>
+      <div class="cal" id="calOut" aria-live="polite"></div>
     </section>
   </div>
 </aside>
@@ -465,7 +498,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
     <div class="btn-row"><button type="submit" class="primary" id="pdOk"></button><button type="button" class="ghost" id="pdCancel"></button></div>
   </form>
 </div>
-<datalist id="dlDev"></datalist><datalist id="dlLoc"></datalist><datalist id="dlOrig"></datalist>
+<datalist id="dlBy"></datalist><datalist id="dlDev"></datalist><datalist id="dlLoc"></datalist><datalist id="dlOrig"></datalist>
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastAct" hidden></button></div>
 
 <script>
@@ -474,6 +507,7 @@ const $ = id => document.getElementById(id);
 const LS_KEY = 'scadalog.v2';
 const LS_OLD = 'worklog.v1';
 const LS_BACKUP = 'scadalog.lastBackup';
+const LS_ME = 'scadalog.me';
 const FS_OK = 'showSaveFilePicker' in window;
 const JSON_TYPES = [{ description: 'JSON', accept: { 'application/json': ['.json'] } }];
 const DEFAULTS = {
@@ -577,13 +611,13 @@ function toast(msg, opt = {}) {
 }
 
 /* ---------- данные ---------- */
-const DEF_SITE = { lat: 41.3111, lon: 69.2797, maxAngle: 60, gcr: null, westPositive: true, set: false }; // по умолчанию Ташкент
+const DEF_SITE = { lat: 41.3111, lon: 69.2797, maxAngle: 60, gcr: null, skew: 0, westPositive: true, set: false }; // по умолчанию Ташкент
 function normSite(s) {
   s = s && typeof s === 'object' ? s : {};
   const n = (v, d, lo, hi) => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(x) && x >= lo && x <= hi ? x : d; };
   return {
     lat: n(s.lat, DEF_SITE.lat, -90, 90), lon: n(s.lon, DEF_SITE.lon, -180, 180),
-    maxAngle: n(s.maxAngle, DEF_SITE.maxAngle, 10, 90), gcr: n(s.gcr, null, 0.1, 0.95),
+    maxAngle: n(s.maxAngle, DEF_SITE.maxAngle, 10, 90), gcr: n(s.gcr, null, 0.1, 0.95), skew: n(s.skew, 0, -60, 60),
     westPositive: s.westPositive !== false, set: !!s.set
   };
 }
@@ -593,8 +627,14 @@ function normSettings(raw) {
     deviceTypes: list(raw && raw.deviceTypes, DEFAULTS.deviceTypes),
     actions: list(raw && raw.actions, DEFAULTS.actions),
     site: normSite(raw && raw.site),
+    alertHours: (() => { const h = parseFloat(String(raw && raw.alertHours != null ? raw.alertHours : '').replace(',', '.')); return isFinite(h) && h >= 0 && h <= 72 ? h : 2; })(),
     updatedAt: raw && raw.updatedAt ? iso(raw.updatedAt) : ''
   };
+}
+function normHist(h) {
+  if (!Array.isArray(h)) return [];
+  const t = v => String(v == null ? '' : v).slice(0, 300);
+  return h.map(x => x && Array.isArray(x.ch) ? { at: iso(x.at), by: str(x.by), ch: x.ch.map(c => c && c.k ? { k: t(c.k), a: t(c.a), b: t(c.b) } : null).filter(Boolean) } : null).filter(x => x && x.ch.length).slice(-30);
 }
 function normEntry(e) {
   if (!e || typeof e !== 'object') return null;
@@ -607,7 +647,7 @@ function normEntry(e) {
     device: str(e.device), action: legacy ? 'Другое' : str(e.action), angle: a,
     open: !!e.open, restore: !!e.restore, origState: str(e.origState),
     linkedTo: str(e.linkedTo), closedBy: str(e.closedBy),
-    notes: legacy ? str(e.text) : str(e.notes),
+    notes: legacy ? str(e.text) : str(e.notes), by: str(e.by), history: normHist(e.history),
     createdAt: iso(e.createdAt || e.ts), updatedAt: iso(e.updatedAt || e.createdAt || e.ts), deleted: !!e.deleted
   };
   return (out.action || out.device || out.location || out.notes) ? out : null;
@@ -631,9 +671,21 @@ function parseData(data) {
   };
 }
 // Слияние по id: побеждает более свежая правка. Удалённое остаётся пометкой, чтобы не «воскресало» при загрузке копии.
+// История правок двух копий одной записи объединяется, чтобы правка с другого компьютера не терялась.
+function mergeHist(a, b) {
+  const seen = new Map();
+  for (const h of [...(a || []), ...(b || [])]) seen.set(h.at + '|' + h.by + '|' + stable(h.ch), h);
+  return [...seen.values()].sort((x, y) => (x.at < y.at ? -1 : x.at > y.at ? 1 : 0)).slice(-30);
+}
 function mergeById(a, b) {
   const m = new Map();
-  for (const x of [...a, ...b]) { const c = m.get(x.id); if (!c || x.updatedAt > c.updatedAt) m.set(x.id, x); }
+  for (const x of [...a, ...b]) {
+    const c = m.get(x.id);
+    if (!c) { m.set(x.id, x); continue; }
+    const win = x.updatedAt > c.updatedAt ? x : c, lose = win === x ? c : x;
+    if (win.history || lose.history) win.history = mergeHist(win.history, lose.history);
+    m.set(x.id, win);
+  }
   return [...m.values()];
 }
 function absorb(got) {
@@ -653,6 +705,7 @@ const aliveW = () => state.workers.filter(w => !w.deleted);
 const find = id => state.entries.find(e => e.id === id);
 const findW = id => id ? state.workers.find(w => w.id === id) : null;
 const isPending = e => (e.open || e.restore) && !e.closedBy;
+const isLate = e => isPending(e) && state.settings.alertHours > 0 && Date.now() - new Date(e.ts) > state.settings.alertHours * 3600000;
 // Править можно только записи сегодняшнего дня (по дате звонка). Записи прошлых дней закрыты. Удалять записи нельзя вообще.
 const canEdit = e => dayKey(new Date(e.ts)) === todayKey();
 function callerOf(e) {
@@ -1141,12 +1194,12 @@ function sheetXml(rows, widths) {
 }
 function buildXlsx(entries) {
   const serial = d => (d.getTime() - d.getTimezoneOffset() * 60000) / 86400000 + 25569;
-  const r1 = [['Дата', 'Время', 'Кто звонил', 'Телефон', 'Устройство', 'Номер', 'Место', 'Что просили', 'Угол, °', 'Что вернуть', 'Статус', 'Примечание']];
+  const r1 = [['Дата', 'Время', 'Кто звонил', 'Телефон', 'Устройство', 'Номер', 'Место', 'Что просили', 'Угол, °', 'Что вернуть', 'Статус', 'Примечание', 'Записал', 'Правок']];
   for (const e of entries) {
     const d = new Date(e.ts), s = serial(d), c = callerOf(e);
     r1.push([{ n: Math.floor(s), s: 2 }, { n: +(s - Math.floor(s)).toFixed(8), s: 3 }, c.name, fmtPhone(c.phone),
       e.deviceType, e.device, e.location, e.action, e.angle, (e.open || e.restore) ? needText(e) : '',
-      isPending(e) ? 'ждёт возврата' : (e.closedBy ? 'возвращено' : ''), e.notes]);
+      isPending(e) ? 'ждёт возврата' : (e.closedBy ? 'возвращено' : ''), e.notes, e.by, (e.history || []).length || '']);
   }
   const st = workerStats();
   const r2 = [['Имя', 'Телефон', 'Примечание', 'Звонков']];
@@ -1157,7 +1210,7 @@ function buildXlsx(entries) {
     { name: 'xl/workbook.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Звонки" sheetId="1" r:id="rId1"/><sheet name="Работники" sheetId="2" r:id="rId2"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">\'Звонки\'!$A$1:$' + colName(r1[0].length - 1) + '$' + r1.length + '</definedName><definedName name="_xlnm._FilterDatabase" localSheetId="1" hidden="1">\'Работники\'!$A$1:$' + colName(r2[0].length - 1) + '$' + r2.length + '</definedName></definedNames></workbook>' },
     { name: 'xl/_rels/workbook.xml.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
     { name: 'xl/styles.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd.mm.yyyy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="20" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' },
-    { name: 'xl/worksheets/sheet1.xml', data: sheetXml(r1, [12, 8, 24, 18, 16, 14, 18, 20, 9, 28, 15, 40]) },
+    { name: 'xl/worksheets/sheet1.xml', data: sheetXml(r1, [12, 8, 24, 18, 16, 14, 18, 20, 9, 28, 15, 40, 18, 8]) },
     { name: 'xl/worksheets/sheet2.xml', data: sheetXml(r2, [26, 18, 30, 10]) }
   ];
   return zipStore(files, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1248,11 +1301,27 @@ function fillDatalists() {
   $('dlDev').innerHTML = opts(uniqRecent('device', e => e.deviceType === form.type));
   $('dlLoc').innerHTML = opts(uniqRecent('location'));
   $('dlOrig').innerHTML = opts([...new Set(['Авто', 'Авто, угол 0°', 'В работе', ...uniqRecent('origState')])]);
+  $('dlBy').innerHTML = opts([...new Set(alive().map(e => e.by).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')));
 }
 function setMode(mode) {
   $('cTitle').textContent = { new: 'Новый звонок', edit: 'Изменить запись', return: 'Возврат устройства', repeat: 'Повторный звонок' }[mode];
   $('btnCancelEdit').hidden = mode === 'new';
   $('btnSave').textContent = mode === 'edit' ? 'Сохранить изменения' : 'Записать';
+}
+// Что изменилось при правке записи: список {k, a, b}, где a — было, b — стало.
+const FIELD_LABELS = { ts: 'время звонка', caller: 'звонивший', deviceType: 'устройство', device: 'номер', location: 'место', action: 'что просили', angle: 'угол', restore: 'вернуть в исходное', origState: 'исходное состояние', notes: 'примечание' };
+function diffEntry(old, nw) {
+  const out = [], cut = v => String(v == null ? '' : v).slice(0, 300);
+  const add = (k, a, b) => { if (cut(a) !== cut(b)) out.push({ k, a: cut(a), b: cut(b) }); };
+  const oc = callerOf(old);
+  add('caller', oc.name || fmtPhone(oc.phone), nw.callerName || fmtPhone(nw.callerPhone));
+  if (old.ts !== nw.ts) add('ts', old.ts, nw.ts);
+  add('deviceType', old.deviceType, nw.deviceType); add('device', old.device, nw.device); add('location', old.location, nw.location);
+  add('action', old.action, nw.action);
+  add('angle', old.angle == null ? '' : fmtAngle(old.angle), nw.angle == null ? '' : fmtAngle(nw.angle));
+  add('restore', old.restore ? 'да' : 'нет', nw.restore ? 'да' : 'нет');
+  add('origState', old.origState, nw.origState); add('notes', old.notes, nw.notes);
+  return out;
 }
 function resetComposer() {
   editingId = null; linkingId = null; adding = null; setMode('new');
@@ -1292,6 +1361,7 @@ function loadComposer(mode, src) {
   renderPickers(); syncAngle(); syncOrig(); fillDatalists();
   openComposer(mode === 'edit' ? $('fNotes') : (form.workerId ? (mode === 'return' ? $('btnSave') : $('fDev')) : $('fWho')));
 }
+try { $('fBy').value = localStorage.getItem(LS_ME) || ''; } catch (e) { /* нет доступа */ }
 function refreshTs() { if (tsAuto && !editingId) $('fTs').value = toLocalInput(new Date()); }
 $('fTs').addEventListener('input', () => { tsAuto = false; renderSolar(); });
 function openComposer(focusEl) {
@@ -1333,7 +1403,10 @@ function sunPos(date, lat, lon) {
 // Одноосный трекер, горизонтальная ось север-юг. θ > 0: стол наклонён на запад, θ < 0: на восток.
 function trackerAngle(p, site) {
   const el = p.el * RAD, az = p.az * RAD;
-  const raw = Math.atan2(-Math.cos(el) * Math.sin(az), Math.sin(el)) / RAD;
+  // Солнце в осях, привязанных к ряду: xa — составляющая поперёк оси трекера. При повороте рядов 0 это прежняя формула.
+  const sk = (site.skew || 0) * RAD;
+  const xa = Math.cos(el) * Math.sin(az) * Math.cos(sk) - Math.cos(el) * Math.cos(az) * Math.sin(sk);
+  const raw = Math.atan2(-xa, Math.sin(el)) / RAD;
   let th = raw, bt = false;
   if (site.gcr) {
     const r = Math.cos(th * RAD) / site.gcr;
@@ -1395,6 +1468,7 @@ function fillSite() {
   const s = state.settings.site;
   $('sLat').value = String(s.lat); $('sLon').value = String(s.lon); $('sMax').value = String(s.maxAngle);
   $('sGcr').value = s.gcr ? String(s.gcr).replace('.', ',') : ''; $('sSign').value = s.westPositive ? 'w' : 'e';
+  $('sSkew').value = s.skew ? String(s.skew).replace('.', ',') : '';
 }
 $('sLat').addEventListener('input', () => { // «41.31, 69.28» из Google Maps целиком
   const m = $('sLat').value.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$/);
@@ -1410,13 +1484,85 @@ $('btnGeo').onclick = () => {
 $('btnSaveSite').onclick = () => {
   const num = id => parseFloat($(id).value.replace(',', '.'));
   const lat = num('sLat'), lon = num('sLon'), mx = num('sMax'), g = $('sGcr').value.trim(), gcr = g === '' ? null : parseFloat(g.replace(',', '.'));
+  const sk = $('sSkew').value.trim() === '' ? 0 : num('sSkew');
+  if (!isFinite(sk) || Math.abs(sk) > 60) { toast('Поворот рядов: число от -60 до 60', { error: true }); $('sSkew').focus(); return; }
   if (!isFinite(lat) || Math.abs(lat) > 90) { toast('Широта: число от -90 до 90', { error: true }); $('sLat').focus(); return; }
   if (!isFinite(lon) || Math.abs(lon) > 180) { toast('Долгота: число от -180 до 180', { error: true }); $('sLon').focus(); return; }
   if (!isFinite(mx) || mx < 10 || mx > 90) { toast('Предельный угол: от 10 до 90', { error: true }); $('sMax').focus(); return; }
   if (gcr !== null && (!isFinite(gcr) || gcr < 0.1 || gcr > 0.95)) { toast('GCR: число от 0,1 до 0,95 или пусто', { error: true }); $('sGcr').focus(); return; }
-  state.settings = { ...state.settings, site: { lat, lon, maxAngle: mx, gcr, westPositive: $('sSign').value === 'w', set: true }, updatedAt: new Date().toISOString() };
-  persist(); renderSolar(); toast('Станция сохранена');
+  state.settings = { ...state.settings, site: { lat, lon, maxAngle: mx, gcr, skew: sk, westPositive: $('sSign').value === 'w', set: true }, updatedAt: new Date().toISOString() };
+  persist(); renderSolar(); calNote = ''; renderCal(); toast('Станция сохранена');
 };
+
+/* ---------- Сверка угла со SCADA ---------- */
+const LS_CAL = 'scadalog.calib';
+function calLoad() { try { const a = JSON.parse(localStorage.getItem(LS_CAL) || '[]'); return Array.isArray(a) ? a.filter(p => p && isFinite(+p.a) && !isNaN(new Date(p.t))) : []; } catch (e) { return []; } }
+function calSave(a) { try { localStorage.setItem(LS_CAL, JSON.stringify(a.slice(-12))); } catch (e) { /* нет доступа */ } }
+// Угол по расчёту в градусах SCADA (со знаком станции) или null, если солнце за горизонтом.
+function calcFor(t, site) {
+  const p = sunPos(new Date(t), site.lat, site.lon);
+  if (p.el <= 0) return null;
+  const tr = trackerAngle(p, site);
+  return { v: site.westPositive ? tr.cmd : -tr.cmd, clipped: tr.clipped, bt: tr.backtrack };
+}
+const fmtDeg = v => (Math.round(v * 10) / 10 > 0 ? '+' : Math.round(v * 10) / 10 < 0 ? '−' : '') + String(Math.abs(Math.round(v * 10) / 10)).replace('.', ',') + '°';
+let calNote = '';
+function renderCal() {
+  const box = $('calOut'); if (!box) return;
+  if (!$('cTime').value) $('cTime').value = toLocalInput(new Date());
+  const pts = calLoad(), site = state.settings.site;
+  if (!pts.length) { box.innerHTML = calNote ? `<p class="sum">${calNote}</p>` : ''; return; }
+  let sum = 0, n = 0;
+  const rows = pts.map((p, i) => {
+    const c = calcFor(p.t, site), d = new Date(p.t);
+    if (!c) return `<tr><td>${esc(shortDate(d))} ${hm(d)}</td><td>${fmtDeg(p.a)}</td><td colspan="2">солнце за горизонтом</td><td><button type="button" class="x" data-calx="${i}" aria-label="Убрать точку">✕</button></td></tr>`;
+    const diff = c.v - p.a;
+    sum += Math.abs(diff); n++;
+    return `<tr><td>${esc(shortDate(d))} ${hm(d)}</td><td>${fmtDeg(p.a)}</td><td>${fmtDeg(c.v)}${c.clipped ? ' (предел)' : c.bt ? ' (backtracking)' : ''}</td><td class="${Math.abs(diff) > 3 ? 'bad' : 'ok'}">${fmtDeg(diff)}</td><td><button type="button" class="x" data-calx="${i}" aria-label="Убрать точку">✕</button></td></tr>`;
+  });
+  const avg = n ? sum / n : null;
+  box.innerHTML = `<table><thead><tr><th>Время</th><th>SCADA</th><th>Расчёт</th><th>Разница</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table>` +
+    (avg != null ? `<p class="sum">Средняя ошибка: <b class="${avg > 3 ? 'bad' : 'ok'}">${String(Math.round(avg * 10) / 10).replace('.', ',')}°</b> по ${n} точкам. Хорошим совпадением считается до 2–3°.</p>` : '') +
+    (calNote ? `<p class="sum">${calNote}</p>` : '');
+}
+// Среднеквадратичная ошибка расчёта по точкам при заданных параметрах станции.
+function calRms(pts, site) {
+  let s2 = 0, n = 0;
+  for (const p of pts) { const c = calcFor(p.t, site); if (c) { s2 += (c.v - p.a) ** 2; n++; } }
+  return n ? Math.sqrt(s2 / n) : null;
+}
+function calFit() {
+  const pts = calLoad(), site = state.settings.site;
+  const up = pts.filter(p => calcFor(p.t, site));
+  if (up.length < 2) { calNote = 'Для подбора нужно хотя бы 2 точки при солнце над горизонтом.'; renderCal(); return; }
+  let best = null;
+  for (let k = -450; k <= 450; k++) {
+    const sk = k / 10, r = calRms(up, { ...site, skew: sk });
+    if (best === null || r < best.r - 1e-9 || (Math.abs(r - best.r) < 1e-9 && Math.abs(sk) < Math.abs(best.sk))) best = { sk, r };
+  }
+  const now = calRms(up, site), flipped = calRms(up, { ...site, westPositive: !site.westPositive });
+  const f1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
+  let t = `Лучший поворот рядов: <b>${f1(best.sk)}°</b>, ошибка ${f1(best.r)}° (сейчас ${f1(site.skew || 0)}°, ошибка ${f1(now)}°).`;
+  if (flipped < now * 0.5 && flipped < best.r + 1) t += ' <b class="bad">Похоже, знак угла обратный: проверьте настройку «Знак угла в SCADA».</b>';
+  else if (best.r > 4) t += ' Ошибка остаётся большой. Возможные причины: включён backtracking (укажите GCR), другой предельный угол, наклон участка или неверные координаты.';
+  else if (Math.abs(best.sk - (site.skew || 0)) >= 1) t += ' <button type="button" class="ghost" id="btnCalApply">Подставить в настройки</button>';
+  calNote = t; renderCal();
+  const ap = $('btnCalApply'); if (ap) ap.onclick = () => { $('sSkew').value = String(best.sk).replace('.', ','); calNote = 'Значение подставлено в поле «Поворот рядов». Нажмите «Сохранить станцию».'; renderCal(); };
+}
+$('btnCalAdd').onclick = () => {
+  const t = $('cTime').value, a = parseFloat($('cAngle').value.replace(',', '.').replace('−', '-'));
+  if (!t || isNaN(new Date(t))) { toast('Укажи время', { error: true }); $('cTime').focus(); return; }
+  if (!isFinite(a) || Math.abs(a) > 90) { toast('Угол: число от -90 до 90', { error: true }); $('cAngle').focus(); return; }
+  if (new Date(t) - Date.now() > 10 * 60000) { toast('Время в будущем', { error: true }); return; }
+  calSave([...calLoad(), { t: new Date(t).toISOString(), a }]);
+  $('cAngle').value = ''; calNote = ''; renderCal(); $('cAngle').focus();
+};
+$('btnCalFit').onclick = calFit;
+$('btnCalClear').onclick = () => { calSave([]); calNote = ''; renderCal(); };
+$('calOut').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-calx]'); if (!b) return;
+  const a = calLoad(); a.splice(+b.dataset.calx, 1); calSave(a); calNote = ''; renderCal();
+});
 
 /* ---------- выбор работника ---------- */
 let whoItems = [], whoActive = -1;
@@ -1517,8 +1663,13 @@ function saveEntry() {
   const rawA = $('fAngle').value.trim().replace(',', '.');
   const angle = rawA === '' ? null : Number(rawA);
   if (angle !== null && (!isFinite(angle) || Math.abs(angle) > 90)) { toast('Угол: число от -90 до 90', { error: true }); $('fAngle').focus(); return; }
-  const tsIso = (tsAuto && !editingId) || !$('fTs').value ? new Date().toISOString() : new Date($('fTs').value).toISOString();
+  // Поле времени хранит минуты. Если при правке время не трогали, оставляем исходное значение с секундами, иначе оно «меняется» само.
+  const cur0 = editingId && find(editingId);
+  const tsIso = cur0 && $('fTs').value === toLocalInput(new Date(cur0.ts)) ? cur0.ts
+    : (tsAuto && !editingId) || !$('fTs').value ? new Date().toISOString() : new Date($('fTs').value).toISOString();
   if (new Date(tsIso) - Date.now() > 10 * 60000) { toast('Время звонка в будущем. Проверь дату и время', { error: true }); $('fTs').focus(); return; }
+  const me = $('fBy').value.trim().replace(/\s+/g, ' ');
+  if (!me) { toast('Укажи, кто записывает: поле «Диспетчер»', { error: true }); $('fBy').focus(); if (mqMobile.matches) $('fBy').scrollIntoView({ block: 'center' }); return; }
   const r = resolveCaller();
   if (r.error) { toast(r.error, { error: true }); return; }
   const now = new Date().toISOString(), w = r.w, restore = $('fRestore').checked;
@@ -1536,10 +1687,17 @@ function saveEntry() {
   }
   const wasEdit = !!editingId;
   let id = editingId;
-  if (wasEdit) { const en = find(editingId); if (en) Object.assign(en, data); }
+  try { localStorage.setItem(LS_ME, me); } catch (e) { /* нет доступа */ }
+  if (wasEdit) {
+    const en = find(editingId);
+    const ch = en ? diffEntry(en, data) : [];
+    if (!ch.length) { resetComposer(); closeSheet(); render(); toast('Изменений нет'); return; }
+    Object.assign(en, data);
+    en.history = [...(en.history || []), { at: now, by: me, ch }].slice(-30);
+  }
   else {
     id = uid();
-    state.entries.push({ id, createdAt: now, linkedTo: linkingId || '', closedBy: '', deleted: false, ...data });
+    state.entries.push({ id, createdAt: now, linkedTo: linkingId || '', closedBy: '', deleted: false, by: me, history: [], ...data });
     const orig = linkingId && find(linkingId);
     if (orig) { orig.closedBy = id; orig.updatedAt = now; }
   }
@@ -1552,7 +1710,7 @@ $('form').addEventListener('submit', e => { e.preventDefault(); saveEntry(); });
 
 /* ---------- день ---------- */
 function stateHTML(e, byId) {
-  if (isPending(e)) return `<span class="c-state open">${esc(needText(e))}</span>`;
+  if (isPending(e)) return `<span class="c-state ${isLate(e) ? 'late' : 'open'}">${esc(needText(e))}${isLate(e) ? '. Ждёт уже ' + fmtAgo(e.ts) : ''}</span>`;
   if (e.closedBy && (e.open || e.restore)) {
     const c = byId.get(e.closedBy);
     const what = e.restore && !e.open ? 'Возвращено в исходное' : 'Запущено';
@@ -1568,18 +1726,32 @@ const HUES = [192, 28, 262, 140, 335, 215, 55, 0, 100, 300];
 const typeHue = t => { const i = state.settings.deviceTypes.indexOf(t); return i >= 0 ? HUES[i % HUES.length] : hue(t); };
 const tag = t => t ? `<span class="tag" style="--h:${typeHue(t)}">${esc(t)}</span>` : '';
 const whatText = e => `${tag(e.deviceType)}<b>${esc(e.device || e.location || '—')}</b>${e.device && e.location ? ', ' + esc(e.location) : ''}. ${esc(e.action)}${e.angle != null ? ', угол ' + fmtAngle(e.angle) + '°' : ''}`;
+const histOpen = new Set();
+const histVal = (k, v) => k === 'ts' ? (v ? hm(new Date(v)) : '') : v;
+function histHTML(e) {
+  const h = e.history || [];
+  if (!h.length) return '';
+  const items = h.map(x => `<li><b>${hm(new Date(x.at))}${x.by ? ' ' + esc(x.by) : ''}:</b> ` + x.ch.map(c => `${esc(FIELD_LABELS[c.k] || c.k)}: «${esc(histVal(c.k, c.a)) || '—'}» → «${esc(histVal(c.k, c.b)) || '—'}»`).join('; ') + '</li>').join('');
+  return `<details class="c-hist" data-hid="${esc(e.id)}"${histOpen.has(e.id) ? ' open' : ''}><summary>Правок: ${h.length}</summary><ul>${items}</ul></details>`;
+}
+document.addEventListener('toggle', ev => {
+  const d = ev.target;
+  if (d && d.classList && d.classList.contains('c-hist')) { if (d.open) histOpen.add(d.dataset.hid); else histOpen.delete(d.dataset.hid); }
+}, true);
 function callHTML(e, byId) {
   const c = callerOf(e), pending = isPending(e);
   const who = c.name || c.phone
     ? `<b>${esc(c.name || fmtPhone(c.phone))}</b>${c.name && c.phone ? `<a href="tel:+${esc(c.phone)}">${esc(fmtPhone(c.phone))}</a>` : ''}`
     : '<span class="muted">Звонивший не указан</span>';
-  return `<li class="call${pending ? ' is-open' : ''}" data-id="${esc(e.id)}">
+  return `<li class="call${pending ? ' is-open' : ''}${isLate(e) ? ' late' : ''}" data-id="${esc(e.id)}">
     <time class="c-time" datetime="${esc(e.ts)}">${hm(new Date(e.ts))}</time><span class="c-dot"></span>
     <div class="c-body">
       <div class="c-who">${who}</div>
       <div class="c-what">${whatText(e)}</div>
       ${stateHTML(e, byId)}
       ${e.notes ? `<p class="c-notes">${esc(e.notes)}</p>` : ''}
+      ${e.by ? `<p class="c-meta">Записал: ${esc(e.by)}</p>` : ''}
+      ${histHTML(e)}
       <div class="c-acts">
         ${pending ? '<button type="button" class="ret" data-act="return">Вернуть</button>' : ''}
         <button type="button" data-act="repeat">Повторить</button>
@@ -1604,17 +1776,20 @@ function render() {
   const pct = t => ((t.getHours() * 60 + t.getMinutes()) / 1440 * 100).toFixed(3) + '%';
   $('tapeTrack').innerHTML = day.map(e => {
     const t = new Date(e.ts), c = callerOf(e);
-    return `<button type="button" class="mk${isPending(e) ? ' open' : ''}" style="left:${pct(t)}" data-goto="${esc(e.id)}" title="${esc(hm(t) + ' ' + (c.name || '') + ': ' + (e.device || e.location) + ', ' + e.action)}" aria-label="${esc(hm(t) + ', ' + (e.device || e.location))}"></button>`;
+    return `<button type="button" class="mk${isLate(e) ? ' late' : isPending(e) ? ' open' : ''}" style="left:${pct(t)}" data-goto="${esc(e.id)}" title="${esc(hm(t) + ' ' + (c.name || '') + ': ' + (e.device || e.location) + ', ' + e.action)}" aria-label="${esc(hm(t) + ', ' + (e.device || e.location))}"></button>`;
   }).join('') + (isToday ? `<span class="now" style="left:${pct(new Date())}"></span>` : '');
   $('tapeHours').innerHTML = [0, 3, 6, 9, 12, 15, 18, 21].map(h => `<span${h % 6 ? ' class="minor"' : ''} style="left:${h / 24 * 100}%">${pad(h)}:00</span>`).join('');
 
   // ожидают возврата (за все дни)
   const open = all.filter(isPending).sort((a, b) => a.ts.localeCompare(b.ts));
   $('waiting').hidden = !open.length;
-  $('waitTitle').textContent = 'Ожидают возврата: ' + open.length;
+  const late = open.filter(isLate);
+  $('waitTitle').textContent = 'Ожидают возврата: ' + open.length + (late.length ? ', просрочено: ' + late.length : '');
+  $('waiting').classList.toggle('has-late', late.length > 0);
+  document.title = (late.length ? '(' + late.length + ') ' : '') + 'Журнал диспетчера';
   $('waitList').innerHTML = open.map(e => {
     const c = callerOf(e);
-    return `<div class="w-item" data-id="${esc(e.id)}">
+    return `<div class="w-item${isLate(e) ? ' late' : ''}" data-id="${esc(e.id)}">
       <button type="button" class="what" data-goto="${esc(e.id)}">${whatText(e)}${c.name ? '. Звонил ' + esc(c.name) : ''}<span class="need">${esc(needText(e))}</span></button>
       <span class="ago" title="${esc(new Date(e.ts).toLocaleString('ru-RU'))}">${fmtAgo(e.ts)}</span>
       <button type="button" class="btn-return" data-act="return">Вернуть</button></div>`;
@@ -1677,7 +1852,7 @@ function renderDrawer() {
   ['workers', 'data', 'lists'].forEach(t => { $('tab-' + t).hidden = t !== curTab; });
   if (curTab === 'workers') renderWorkers();
   if (curTab === 'data') { updateFileUI(); renderBackupState(); renderGhSection(); }
-  if (curTab === 'lists') { $('sTypes').value = state.settings.deviceTypes.join('\n'); $('sActions').value = state.settings.actions.join('\n'); fillSite(); }
+  if (curTab === 'lists') { $('sTypes').value = state.settings.deviceTypes.join('\n'); $('sActions').value = state.settings.actions.join('\n'); $('sAlert').value = String(state.settings.alertHours).replace('.', ','); fillSite(); renderCal(); }
 }
 $('btnMenu').onclick = () => openDrawer();
 $('drawerClose').onclick = closeDrawer;
@@ -1763,7 +1938,9 @@ $('wList').addEventListener('click', ev => {
 $('btnResetLists').onclick = () => { $('sTypes').value = DEFAULTS.deviceTypes.join('\n'); $('sActions').value = DEFAULTS.actions.join('\n'); };
 $('btnSaveLists').onclick = () => {
   const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean);
-  state.settings = normSettings({ deviceTypes: lines('sTypes'), actions: lines('sActions'), site: state.settings.site, updatedAt: new Date().toISOString() });
+  const ah = $('sAlert').value.trim() === '' ? 2 : parseFloat($('sAlert').value.replace(',', '.'));
+  if (!isFinite(ah) || ah < 0 || ah > 72) { toast('Часы: число от 0 до 72', { error: true }); $('sAlert').focus(); return; }
+  state.settings = normSettings({ ...state.settings, deviceTypes: lines('sTypes'), actions: lines('sActions'), alertHours: ah, updatedAt: new Date().toISOString() });
   persist(); renderPickers(); render();
   toast('Списки сохранены');
 };
