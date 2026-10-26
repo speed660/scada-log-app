@@ -187,7 +187,6 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .c-acts{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:6px}
 .c-acts button{font-size:13px;font-weight:600;color:var(--teal);min-height:30px}
 .c-acts button:hover{text-decoration:underline}
-.c-acts .del{color:var(--danger)}
 .c-acts .ret{color:var(--ok)}
 @media (hover:hover) and (min-width:861px){.c-acts{position:absolute;top:10px;right:12px;margin:0;padding:2px 4px 2px 12px;background:var(--panel);border-radius:var(--r-s);opacity:0;transition:opacity .12s}.call:hover .c-acts,.call:focus-within .c-acts{opacity:1}}
 .empty{margin-top:28px;padding:34px 24px;border:1px dashed var(--line);border-radius:var(--r-l);text-align:center;color:var(--muted)}
@@ -297,7 +296,6 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
       <div class="field" id="angleGroup" hidden><label for="fAngle">Угол наклона, °</label><input id="fAngle" inputmode="decimal" placeholder="30"><div class="solar" id="solar" aria-live="polite"></div></div>
       <div class="field"><label for="fTs">Время звонка</label><input id="fTs" type="datetime-local"></div>
       <div class="checks">
-        <label class="check"><input type="checkbox" id="fOpen"> Устройство остановлено, нужно запустить</label>
         <label class="check"><input type="checkbox" id="fRestore"> Потом вернуть в исходное состояние</label>
         <div class="orig" id="origGroup" hidden><input id="fOrig" list="dlOrig" placeholder="Каким было: авто, угол 0°…" aria-label="Исходное состояние"></div>
       </div>
@@ -421,7 +419,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
       <h3>Списки для формы</h3>
       <div class="field"><label for="sTypes">Устройства, по одному на строку</label><textarea id="sTypes" rows="7"></textarea></div>
       <div class="field"><label for="sActions">Что просят, по одному на строку</label><textarea id="sActions" rows="9"></textarea></div>
-      <p class="note">«Остановка» и «отключение» сразу ставят отметку «нужно запустить». «Ручной», «угол» и «наклон» ставят отметку «вернуть в исходное», а «угол» и «наклон» ещё открывают поле угла. Новые пункты можно добавлять и прямо в форме кнопкой «+ Своё».</p>
+      <p class="note">«Ручной», «угол» и «наклон» сразу ставят отметку «вернуть в исходное», а «угол» и «наклон» ещё открывают поле угла. Новые пункты можно добавлять и прямо в форме кнопкой «+ Своё».</p>
       <div class="btn-row">
         <button type="button" class="ghost" id="btnResetLists">Вернуть стандартные</button>
         <button type="button" class="primary" id="btnSaveLists">Сохранить списки</button>
@@ -482,7 +480,6 @@ const DEFAULTS = {
   deviceTypes: ['TCU', 'Трансформатор', 'Инвертор', 'DC-бокс', 'Панель / стринг', 'Другое'],
   actions: ['Остановка', 'Запуск', 'Ручной режим', 'Изменение угла', 'Возврат в авто', 'Сброс аварии', 'Справка / проверка', 'Другое']
 };
-const RX_OPEN = /остан|отключ/i;            // → «нужно запустить»
 const RX_RESTORE = /ручн|угл|угол|наклон/i; // → «вернуть в исходное»
 const RX_ANGLE = /угл|угол|наклон/i;
 const RX_AUTO = /авто|исходн/i;
@@ -656,6 +653,8 @@ const aliveW = () => state.workers.filter(w => !w.deleted);
 const find = id => state.entries.find(e => e.id === id);
 const findW = id => id ? state.workers.find(w => w.id === id) : null;
 const isPending = e => (e.open || e.restore) && !e.closedBy;
+// Править можно только записи сегодняшнего дня (по дате звонка). Записи прошлых дней закрыты. Удалять записи нельзя вообще.
+const canEdit = e => dayKey(new Date(e.ts)) === todayKey();
 function callerOf(e) {
   const w = findW(e.workerId);
   if (w && !w.deleted) return { name: w.name, phone: w.phone };
@@ -1202,7 +1201,7 @@ const syncOrig = () => { $('origGroup').hidden = !$('fRestore').checked; };
 function applyType(v) { form.type = v; renderPickers(); fillDatalists(); }
 function applyAction(v) {
   form.action = v;
-  if (!editingId && !linkingId) { $('fOpen').checked = RX_OPEN.test(v); $('fRestore').checked = RX_RESTORE.test(v); syncOrig(); }
+  if (!editingId && !linkingId) { $('fRestore').checked = RX_RESTORE.test(v); syncOrig(); }
   renderPickers(); syncAngle();
   if (!$('angleGroup').hidden) $('fAngle').focus();
 }
@@ -1262,7 +1261,7 @@ function resetComposer() {
   clearWho();
   ['fDev', 'fLoc', 'fAngle', 'fNotes', 'fOrig'].forEach(id => { $(id).value = ''; });
   $('fTs').value = toLocalInput(new Date()); tsAuto = true;
-  $('fOpen').checked = false; $('fRestore').checked = false;
+  $('fRestore').checked = false;
   renderPickers(); syncAngle(); syncOrig(); fillDatalists();
 }
 function loadComposer(mode, src) {
@@ -1282,8 +1281,8 @@ function loadComposer(mode, src) {
     if (src.angle != null) $('fAngle').value = fmtAngle(src.angle);
     if (mode === 'edit') {
       $('fNotes').value = src.notes;
-      $('fOpen').checked = src.open; $('fRestore').checked = src.restore; $('fOrig').value = src.origState;
-    } else { $('fOpen').checked = RX_OPEN.test(form.action); $('fRestore').checked = RX_RESTORE.test(form.action); }
+      $('fRestore').checked = src.restore; $('fOrig').value = src.origState;
+    } else { $('fRestore').checked = RX_RESTORE.test(form.action); }
   }
   $('fTs').value = toLocalInput(mode === 'edit' ? new Date(src.ts) : new Date());
   tsAuto = mode !== 'edit';
@@ -1527,9 +1526,14 @@ function saveEntry() {
     ts: tsIso,
     workerId: w ? w.id : '', callerName: w ? w.name : '', callerPhone: w ? w.phone : '',
     deviceType: form.type, location, device, action: form.action, angle,
-    open: $('fOpen').checked, restore, origState: restore ? $('fOrig').value.trim() : '',
+    open: editingId && find(editingId) ? !!find(editingId).open : false, restore, origState: restore ? $('fOrig').value.trim() : '',
     notes: $('fNotes').value.trim(), updatedAt: now
   };
+  if (editingId) {
+    const cur = find(editingId);
+    if (!cur || !canEdit(cur)) { toast('Эта запись уже в прошлом дне, её нельзя менять', { error: true }); resetComposer(); closeSheet(); render(); return; }
+    if (dayKey(new Date(tsIso)) !== todayKey()) { toast('Сегодняшнюю запись нельзя перенести на другой день', { error: true }); $('fTs').focus(); return; }
+  }
   const wasEdit = !!editingId;
   let id = editingId;
   if (wasEdit) { const en = find(editingId); if (en) Object.assign(en, data); }
@@ -1579,8 +1583,7 @@ function callHTML(e, byId) {
       <div class="c-acts">
         ${pending ? '<button type="button" class="ret" data-act="return">Вернуть</button>' : ''}
         <button type="button" data-act="repeat">Повторить</button>
-        <button type="button" data-act="edit">Изменить</button>
-        <button type="button" class="del" data-act="del">Удалить</button>
+        ${canEdit(e) ? '<button type="button" data-act="edit">Изменить</button>' : ''}
       </div>
     </div></li>`;
 }
@@ -1591,7 +1594,7 @@ function render() {
   const isToday = viewDay === todayKey();
 
   $('dayTitle').textContent = longDate(d0);
-  $('daySub').textContent = (isToday ? 'Сегодня, ' : '') + (day.length ? calls(day.length) : 'звонков нет');
+  $('daySub').textContent = (isToday ? 'Сегодня, ' : 'Только просмотр, ') + (day.length ? calls(day.length) : 'звонков нет');
   $('nextDay').disabled = viewDay >= todayKey();
   $('btnToday').hidden = isToday;
   $('dayPick').value = viewDay;
@@ -1641,20 +1644,6 @@ $('nextDay').onclick = () => shiftDay(1);
 $('btnToday').onclick = () => goToDay(todayKey());
 $('dayPick').onchange = () => { if ($('dayPick').value) goToDay($('dayPick').value); };
 
-function deleteEntry(e) {
-  const now = new Date().toISOString();
-  e.deleted = true; e.updatedAt = now;
-  const orig = e.linkedTo && find(e.linkedTo);
-  const reopened = orig && orig.closedBy === e.id;
-  if (reopened) { orig.closedBy = ''; orig.updatedAt = now; }
-  persist(); render();
-  toast('Запись удалена', { action: { label: 'Отменить', fn: () => {
-    const t = new Date().toISOString();
-    e.deleted = false; e.updatedAt = t;
-    if (reopened && !orig.closedBy) { orig.closedBy = e.id; orig.updatedAt = t; }
-    persist(); render(); flash(e.id);
-  } } });
-}
 document.addEventListener('click', ev => {
   const g = ev.target.closest('[data-goto]');
   if (g) { const e = find(g.dataset.goto); if (e) { if (!$('drawer').hidden) closeDrawer(); goToDay(dayKey(new Date(e.ts)), e.id); } return; }
@@ -1667,8 +1656,7 @@ document.addEventListener('click', ev => {
   const act = a.dataset.act;
   if (act === 'return') loadComposer('return', e);
   else if (act === 'repeat') loadComposer('repeat', e);
-  else if (act === 'edit') loadComposer('edit', e);
-  else if (act === 'del') deleteEntry(e);
+  else if (act === 'edit') { if (canEdit(e)) loadComposer('edit', e); else toast('Записи прошлых дней нельзя менять', { error: true }); }
 });
 
 /* ---------- меню ---------- */
