@@ -85,7 +85,7 @@ with sync_playwright() as p:
     def on_dialog(d):
         dialogs.append(d.message); (d.accept() if mock.get('accept', True) else d.dismiss())
     pg.on('dialog', on_dialog)
-    pg.goto('file://' + F); pg.wait_for_timeout(300)
+    pg.goto(serve_app(F)); pg.wait_for_timeout(300)
 
     # A. импорт одной записи, открываем вкладку «Данные»
     pg.click('#btnMenu'); pg.click('[data-tab=data]')

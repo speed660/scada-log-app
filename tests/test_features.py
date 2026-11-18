@@ -23,7 +23,7 @@ with sync_playwright() as p:
     pg.on('console', lambda m: errs.append(m.text) if m.type in ('error', 'warning') else None)
     pg.on('pageerror', lambda e: errs.append('PAGEERROR ' + str(e)))
     pg.clock.install(time='2026-10-26T10:00:00+05:00')
-    pg.goto('file://' + APP); pg.wait_for_timeout(300)
+    pg.goto(serve_app()); pg.wait_for_timeout(300)
 
     data = {"app": "scada-log", "version": 4, "savedAt": "2026-10-26T04:00:00Z",
             "settings": {"deviceTypes": ["TCU", "Инвертор"], "actions": ["Остановка", "Запуск", "Ручной режим", "Изменение угла", "Возврат в авто", "Другое"], "updatedAt": ""},
