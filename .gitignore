@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+# Открытый текст учебника в репозиторий попадать не должен: только uchebnik/book.enc (шифртекст).
+solar-uchebnik*
+*uchebnik*.html

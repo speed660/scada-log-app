@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru" data-lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тестовый учебник</title>
+<style>.view{display:none}.view.on{display:block}html[data-lang="ru"] [data-l="uz"]{display:none}html[data-lang="uz"] [data-l="ru"]{display:none}</style>
+</head>
+<body>
+<nav id="tabs"><a href="#home">Главная</a> <a href="#faults">Аварии</a> <a href="https://example.org/" target="_blank" rel="noopener">Внешняя ссылка</a></nav>
+<button id="lang" type="button">UZ</button>
+<section class="view" id="home"><h1><span data-l="ru">ТЕСТОВЫЙ-МАРКЕР-ОТКРЫТОГО-ТЕКСТА</span><span data-l="uz">TEST-MARKER</span></h1><p>Образец для автоматических проверок. Здесь нет реальных данных.</p></section>
+<section class="view" id="faults"><h1>Аварии</h1></section>
+<script>
+(function () {
+  const views = Array.from(document.querySelectorAll('.view'));
+  function route() {
+    const id = decodeURIComponent(location.hash.slice(1)) || 'home';
+    const el = document.getElementById(id) || document.getElementById('home');
+    views.forEach(v => v.classList.toggle('on', v === el));
+  }
+  window.addEventListener('hashchange', route); route();
+  let lang = 'ru'; try { if (localStorage.getItem('solar-lang') === 'uz') lang = 'uz'; } catch (e) {}
+  document.documentElement.setAttribute('data-lang', lang);
+  document.getElementById('lang').addEventListener('click', () => {
+    lang = lang === 'ru' ? 'uz' : 'ru';
+    document.documentElement.setAttribute('data-lang', lang);
+    try { localStorage.setItem('solar-lang', lang); } catch (e) {}
+  });
+  // Проверка защиты: документ не должен уметь ходить в сеть (даже на свой же сервер).
+  window.__net = 'wait';
+  fetch('book.enc').then(() => { window.__net = 'open'; }).catch(() => { window.__net = 'blocked'; });
+})();
+</script>
+</body>
+</html>

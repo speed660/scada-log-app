@@ -4,7 +4,7 @@ import os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 failed = []
-for name in ['test_syntax.py', 'test_ui.py', 'test_rules.py', 'test_features.py', 'test_solar.py', 'test_github.py']:
+for name in ['test_syntax.py', 'test_ui.py', 'test_rules.py', 'test_features.py', 'test_solar.py', 'test_github.py', 'test_uchebnik.py', 'test_leaks.py']:
     print('\n=== ' + name + ' ===', flush=True)
     r = subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True, timeout=600)
     out = r.stdout + r.stderr

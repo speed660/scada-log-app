@@ -44,6 +44,7 @@ a{color:inherit}
 .file-state.warn{color:var(--sun-ink)}
 .menu-btn{border:1px solid var(--line);border-radius:var(--r-m);min-height:38px;padding:0 14px;font-weight:600}
 .menu-btn:hover{background:var(--soft)}
+a.menu-btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 
 /* раскладка */
 .layout{display:grid;grid-template-columns:380px minmax(0,1fr);gap:36px;max-width:1280px;margin:0 auto;padding:28px}
@@ -283,6 +284,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 <header class="top">
   <div class="brand">Журнал диспетчера</div>
   <button type="button" class="file-state" id="fileState"><i></i><span id="fileStateText"></span></button>
+  <a class="menu-btn" id="linkBook" href="uchebnik/">Учебник</a>
   <button type="button" class="menu-btn" id="btnMenu">Меню</button>
 </header>
 

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Страница ничего не отправляет наружу: можно читать только соседний файл book.enc. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Учебник · Darslik</title>
+<style>
+:root{--bg:#f4f1ea;--surface:#fffdf8;--ink:#1c2430;--muted:#5d6673;--line:#dcd6c8;--accent:#a8560f;--accent-ink:#fff;--bad:#b93a2c;--bad-bg:#fbe9e6;--ok:#2f7d4f;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--serif:Georgia,"Iowan Old Style","Times New Roman",serif}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--surface:#1a2028;--ink:#e8e4da;--muted:#9aa3ae;--line:#2e3642;--accent:#e3a04f;--accent-ink:#1a1206;--bad:#ee8273;--bad-bg:#3a1b17;--ok:#6cc08b}}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans)}
+.gate{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px 24px 22px;box-shadow:0 1px 2px rgba(28,36,48,.06),0 8px 24px rgba(28,36,48,.08)}
+.sun{display:block;margin:0 auto 10px;color:var(--accent)}
+h1{margin:0 0 4px;font:700 1.3rem/1.25 var(--serif);text-align:center}
+h1 small{display:block;margin-top:2px;font:500 .9rem/1.3 var(--sans);color:var(--muted)}
+.lead{margin:14px 0 18px;text-align:center;color:var(--muted);font-size:.93rem}
+label{display:block;font-weight:600;font-size:.92rem;margin-bottom:6px}
+label span{font-weight:400;color:var(--muted)}
+input{width:100%;font:inherit;padding:.7rem .8rem;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{width:100%;margin-top:12px;font:inherit;font-weight:650;padding:.75rem 1rem;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+button:disabled{opacity:.55;cursor:default}
+.msg{min-height:1.5em;margin:12px 0 0;font-size:.92rem;text-align:center;color:var(--muted)}
+.msg.err{color:var(--bad);background:var(--bad-bg);border-radius:8px;padding:.5rem .7rem;text-align:left}
+.msg small{display:block;opacity:.85}
+.foot{margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted);text-align:center}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="gate">
+  <svg class="sun" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
+  <h1>Учебник по солнечной станции<small lang="uz">Quyosh stansiyasi darsligi</small></h1>
+  <form id="f" autocomplete="off" hidden>
+    <p class="lead">Документ защищён паролем.<br><span lang="uz">Hujjat parol bilan himoyalangan.</span></p>
+    <label for="pw">Пароль <span lang="uz">/ Parol</span></label>
+    <input id="pw" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required>
+    <button type="submit" id="go">Открыть · Ochish</button>
+  </form>
+  <p class="msg" id="msg" role="status" aria-live="polite">Загрузка…</p>
+  <p class="foot">Текст хранится в зашифрованном виде и расшифровывается только в вашем браузере.<br><span lang="uz">Matn shifrlangan holda saqlanadi va faqat brauzeringizda ochiladi.</span></p>
+</main>
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const BOOK = 'book.enc';                 // зашифрованный документ рядом с этой страницей
+  const AAD = 'solar-uchebnik|v1';         // привязка шифртекста к этому формату
+  const SKEY = 'solar.uchebnik.key';       // ключ на время жизни вкладки (sessionStorage)
+  const MAX_TEXT = 20 * 1024 * 1024;
+  const te = new TextEncoder();
+  const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // Защита самого документа после показа: только свои скрипты и стили, никаких запросов в сеть.
+  const DOC_META = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; base-uri \'none\'; form-action \'none\'">' +
+    '<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">';
+
+  const MSG = {
+    loading: ['Загрузка…', 'Yuklanmoqda…'],
+    opening: ['Расшифровка…', 'Ochilmoqda…'],
+    wrong: ['Неверный пароль или файл повреждён.', 'Parol noto‘g‘ri yoki fayl shikastlangan.'],
+    missing: ['Документ ещё не загружен.', 'Hujjat hali yuklanmagan.'],
+    broken: ['Файл документа повреждён или имеет неизвестный формат.', 'Hujjat fayli shikastlangan yoki formati noma’lum.'],
+    net: ['Не удалось загрузить документ. Проверьте связь и обновите страницу.', 'Hujjatni yuklab bo‘lmadi. Aloqani tekshirib, sahifani yangilang.'],
+    unsupported: ['Браузер слишком старый для расшифровки. Откройте страницу в свежем Edge или Chrome.', 'Brauzer eskirgan. Yangi Edge yoki Chrome’da oching.']
+  };
+  const msgEl = $('msg');
+  function say(key, err) {
+    msgEl.className = 'msg' + (err ? ' err' : '');
+    msgEl.textContent = '';
+    msgEl.append(MSG[key][0]);
+    const s = document.createElement('small'); s.lang = 'uz'; s.textContent = MSG[key][1]; msgEl.append(s);
+  }
+  function clearMsg() { msgEl.className = 'msg'; msgEl.textContent = ''; }
+
+  const sGet = () => { try { return JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch (e) { return null; } };
+  const sSet = v => { try { sessionStorage.setItem(SKEY, JSON.stringify(v)); } catch (e) { /* нет доступа: спросим пароль ещё раз */ } };
+  const sDel = () => { try { sessionStorage.removeItem(SKEY); } catch (e) { /* нет доступа */ } };
+
+  let book = null;
+  const sid = () => book.kdf.salt + '.' + book.enc.iv;
+
+  async function loadBook() {
+    let r;
+    try { r = await fetch(BOOK, { cache: 'no-cache' }); } catch (e) { say('net', true); return false; }
+    if (r.status === 404) { say('missing', true); return false; }
+    if (!r.ok) { say('net', true); return false; }
+    try {
+      const j = await r.json();
+      const ok = j && j.app === 'solar-uchebnik' && j.v === 1 && j.gz === true && j.kdf && j.kdf.name === 'PBKDF2' && j.kdf.hash === 'SHA-256' &&
+        Number.isInteger(j.kdf.iter) && j.kdf.iter >= 100000 && j.kdf.iter <= 2000000 && typeof j.kdf.salt === 'string' &&
+        j.enc && j.enc.name === 'AES-GCM' && typeof j.enc.iv === 'string' && typeof j.ct === 'string';
+      if (!ok) throw new Error('format');
+      unb64(j.kdf.salt); unb64(j.enc.iv); unb64(j.ct);
+      book = j; return true;
+    } catch (e) { say('broken', true); return false; }
+  }
+
+  async function keyFromPassword(pw) {
+    const base = await crypto.subtle.importKey('raw', te.encode(pw.normalize('NFKC').trim()), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: unb64(book.kdf.salt), iterations: book.kdf.iter, hash: 'SHA-256' }, base, 256);
+    return new Uint8Array(bits);
+  }
+  async function decryptWith(raw) {
+    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+    let plain;
+    try { plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(book.enc.iv), additionalData: te.encode(AAD) }, key, unb64(book.ct)); }
+    catch (e) { const x = new Error('wrong'); x.code = 'wrong'; throw x; }
+    try {
+      const stream = new Blob([plain]).stream().pipeThrough(new DecompressionStream('gzip'));
+      const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+      if (bytes.length > MAX_TEXT) throw new Error('size');
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch (e) { const x = new Error('broken'); x.code = 'broken'; throw x; }
+  }
+
+  // Заменяет эту страницу документом. Ссылка вида #раздел сохраняется и работает внутри документа.
+  function showDocument(html) {
+    const m = /<head[^>]*>/i.exec(html);
+    const out = m ? html.slice(0, m.index + m[0].length) + DOC_META + html.slice(m.index + m[0].length) : '<!doctype html><head>' + DOC_META + '</head>' + html;
+    document.open(); document.write(out); document.close();
+  }
+
+  const form = $('f'), pw = $('pw'), go = $('go');
+  let fails = 0;
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    if (!book || !pw.value) return;
+    go.disabled = true; pw.disabled = true; say('opening', false);
+    await sleep(30);                                   // даём браузеру показать надпись
+    try {
+      const raw = await keyFromPassword(pw.value);
+      const html = await decryptWith(raw);
+      sSet({ sid: sid(), k: b64(raw) });
+      showDocument(html);
+    } catch (e) {
+      say(e.code === 'broken' ? 'broken' : 'wrong', true);
+      fails++;
+      pw.value = '';
+      await sleep(Math.min(fails, 5) * 700);          // небольшая пауза после ошибки: неудобство для подбора с этой страницы
+      go.disabled = false; pw.disabled = false; pw.focus();
+    }
+  });
+
+  (async function start() {
+    if (!window.crypto || !crypto.subtle || typeof DecompressionStream !== 'function') { say('unsupported', true); return; }
+    if (!(await loadBook())) return;
+    const saved = sGet();
+    if (saved && saved.sid === sid() && typeof saved.k === 'string') {   // эта же вкладка уже вводила пароль
+      say('opening', false);
+      try { showDocument(await decryptWith(unb64(saved.k))); return; } catch (e) { sDel(); }
+    }
+    clearMsg(); form.hidden = false; pw.focus();
+  })();
+})();
+</script>
+</body>
+</html>
