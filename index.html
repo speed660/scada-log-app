@@ -260,7 +260,10 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 
 /* телефон */
 @media (max-width:860px){
-  .top{padding:10px 16px}
+  .top{padding:10px 12px;gap:6px}
+  .brand{font-size:16px;min-width:0;line-height:1.2}
+  .menu-btn{padding:0 10px}
+  .file-state{padding:6px}
   .layout{grid-template-columns:1fr;padding:16px 16px 96px;gap:0}
   .composer{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:60;max-height:92vh;max-height:92dvh;border-radius:18px 18px 0 0;border-bottom:0;transform:translateY(105%);transition:transform .25s ease-out;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
   .composer.open{transform:none}

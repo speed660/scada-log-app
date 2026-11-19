@@ -51,13 +51,15 @@ with sync_playwright() as p:
     br = p.chromium.launch()
 
     # ---------- ссылка из журнала ----------
-    for w in (1280, 360):
+    for w, wide in ((1280, False), (360, False), (360, True), (320, True)):
         c = br.new_context(viewport={'width': w, 'height': 800}); j = c.new_page(); j.goto('file://' + APP)
-        check(f'журнал: ссылка «Учебник» в шапке видна и ведёт в uchebnik/ ({w} px)', j.is_visible('#linkBook') and j.get_attribute('#linkBook', 'href') == 'uchebnik/')
+        if wide: j.add_style_tag(content="html,body,button,input,select,textarea{font-family:'DejaVu Sans',sans-serif !important}")  # самый широкий из обычных шрифтов, как на сервере проверок
+        tag = f'{w} px' + (', широкий шрифт' if wide else '')
+        check(f'журнал: ссылка «Учебник» в шапке видна и ведёт в uchebnik/ ({tag})', j.is_visible('#linkBook') and j.get_attribute('#linkBook', 'href') == 'uchebnik/')
         over = j.evaluate("() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
-        check(f'журнал: шапка не вылезает за экран ({w} px)', over <= 0, over)
-        h = j.evaluate("() => { const t = document.querySelector('.top'); return t.getBoundingClientRect().height; }")
-        check(f'журнал: шапка не раздулась ({w} px)', h < 80, round(h))
+        check(f'журнал: шапка не вылезает за экран ({tag})', over <= 0, over)
+        h = j.evaluate("() => document.querySelector('.top').getBoundingClientRect().height")
+        check(f'журнал: шапка не раздулась ({tag})', h < 80, round(h))
         c.close()
 
     # ---------- шифровальщик ----------
