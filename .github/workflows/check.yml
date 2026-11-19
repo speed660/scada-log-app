@@ -12,7 +12,8 @@ permissions:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    # Версия закреплена: на ubuntu-latest (26.04) Playwright не может поставить браузер.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
