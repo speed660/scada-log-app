@@ -738,6 +738,15 @@ function workerStats() {
 function serialize() {
   return JSON.stringify({ app: 'scada-log', version: 4, savedAt: new Date().toISOString(), settings: state.settings, workers: state.workers, entries: state.entries }, null, 2);
 }
+// Файл для GitHub: без отступов, но каждая запись на своей строке и по порядку времени. Он примерно на четверть меньше читаемой копии,
+// а история коммитов по-прежнему показывает, какая именно запись изменилась. Читается тем же кодом, это обычный JSON.
+function serializeRemote() {
+  const lines = a => '[\n' + a.map(x => JSON.stringify(x)).join(',\n') + '\n]';
+  const entries = [...state.entries].sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : byId(a, b)));
+  const workers = [...state.workers].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : byId(a, b)));
+  return '{"app":"scada-log","version":4,"savedAt":' + JSON.stringify(new Date().toISOString()) + ',\n"settings":' + JSON.stringify(state.settings) +
+    ',\n"workers":' + lines(workers) + ',\n"entries":' + lines(entries) + '\n}\n';
+}
 function persist() { saveLocal(); ghSchedule(); }
 function saveLocal() {
   try { localStorage.setItem(LS_KEY, JSON.stringify({ settings: state.settings, workers: state.workers, entries: state.entries })); } catch (e) { console.warn(e); }
@@ -811,7 +820,7 @@ $('fileState').onclick = async () => {
 /* ---------- GitHub: журнал в файле приватного репозитория ---------- */
 const GH_KEY = 'scadalog.gh';
 let GH_TIMEOUT = 15000; // сколько ждём ответа GitHub, мс
-const gh = { cfg: null, sealed: null, knownSha: null, etag: null, remoteCanon: null, dirty: false, running: null, again: false, err: null, lastOk: null, halted: false, timer: null, retryTimer: null, retryMs: 0 };
+const gh = { cfg: null, sealed: null, knownSha: null, size: null, etag: null, remoteCanon: null, dirty: false, running: null, again: false, err: null, lastOk: null, halted: false, timer: null, retryTimer: null, retryMs: 0 };
 class GhError extends Error { constructor(msg, o) { super(msg); Object.assign(this, o); } }
 const netErr = e => new GhError(e && e.name === 'AbortError' ? 'GitHub не ответил за ' + Math.round(GH_TIMEOUT / 1000) + ' с' : 'Нет связи с GitHub', { kind: 'net' });
 const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -907,7 +916,7 @@ async function ghGet() {
   if (r.status === 404) { gh.etag = null; gh.knownSha = null; return { fresh: true, text: null, sha: null }; } // файла ещё нет
   const j = r.data;
   if (!j || Array.isArray(j) || j.type !== 'file') throw new GhError('По этому пути в репозитории лежит не файл', { kind: 'notfound' });
-  gh.etag = r.headers.get('ETag');
+  gh.etag = r.headers.get('ETag'); gh.size = j.size;
   if (j.sha === gh.knownSha) return { fresh: false };
   let b = j.content;
   if (!b && j.size > 0) b = (await ghFetch(ghApi('/git/blobs/' + j.sha))).data.content; // файл больше 1 МБ
@@ -933,12 +942,12 @@ async function ghSyncOnce() {
       if (rc !== null && canon() === rc) { gh.remoteCanon = rc; gh.dirty = false; return; }
       gh.remoteCanon = rc;
     } else if (canon() === gh.remoteCanon) { gh.dirty = false; return; }
-    const snap = canon(), body = { message: 'Журнал ' + hm(new Date()) + ', записей: ' + alive().length, content: b64enc(serialize()) };
+    const snap = canon(), body = { message: 'Журнал ' + hm(new Date()) + ', записей: ' + alive().length, content: b64enc(serializeRemote()) };
     if (gh.knownSha) body.sha = gh.knownSha;
     if (c.branch) body.branch = c.branch;
     try {
       const res = await ghFetch(ghApi('/contents/' + encPath(c.path)), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      gh.knownSha = res.data.content.sha; gh.etag = null; gh.remoteCanon = snap;
+      gh.knownSha = res.data.content.sha; gh.size = res.data.content.size || gh.size; gh.etag = null; gh.remoteCanon = snap;
       gh.dirty = canon() !== snap;
       return;
     } catch (e) {
@@ -995,7 +1004,8 @@ function renderGhSection() {
   const locked = !ghToken;
   $('btnGhUnlock').hidden = !locked; $('btnGhSync').hidden = locked; $('btnGhLock').hidden = locked;
   const g = ghStatus();
-  $('ghInfo').textContent = gh.cfg.repo + ', ' + (gh.cfg.branch ? 'ветка ' + gh.cfg.branch : 'ветка по умолчанию') + ', файл ' + gh.cfg.path + '. ' + g.text;
+  const sz = gh.size ? ' (' + (gh.size >= 1048576 ? (gh.size / 1048576).toFixed(1).replace('.', ',') + ' МБ' : Math.max(1, Math.round(gh.size / 1024)) + ' КБ') + ')' : '';
+  $('ghInfo').textContent = gh.cfg.repo + ', ' + (gh.cfg.branch ? 'ветка ' + gh.cfg.branch : 'ветка по умолчанию') + ', файл ' + gh.cfg.path + sz + '. ' + g.text;
   $('ghInfo').className = 'backup-state' + (g.cls === 'ok' || g.cls === 'busy' ? '' : ' old');
 }
 function renderGh() { updateFileUI(); renderGhSection(); }

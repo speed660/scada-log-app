@@ -10,7 +10,7 @@ def check(name, cond, extra=''):
     if not cond: fails.append(name)
 
 mock = {'exists': False, 'text': '', 'n': 0, 'puts': 0, 'gets': 0, 'c409': 0, 'hang': False, 'abort': False,
-        'private': True, 'inject_on_put': None, 'inspect': None, 'inspected': None}
+        'private': True, 'inject_on_put': None, 'inspect': None, 'inspected': None, 'big': False}
 def sha(): return f'sha{mock["n"]}'
 def etag(): return f'W/"e{mock["n"]}"'
 CORS = {'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type,if-none-match,accept',
@@ -49,6 +49,7 @@ def handler(route, request):
             if request.headers.get('if-none-match') == etag():
                 route.fulfill(status=304, headers={**CORS, 'etag': etag()}); return
             body = {'type': 'file', 'sha': sha(), 'size': len(mock['text'].encode()), 'content': base64.encodebytes(mock['text'].encode()).decode(), 'encoding': 'base64'}
+            if mock['big']: body['content'] = ''; body['encoding'] = 'none'   # так GitHub отвечает на файлы больше 1 МБ
             js(200, body, {'etag': etag()}); return
         if request.method == 'PUT':
             if mock['inject_on_put']:
@@ -59,7 +60,10 @@ def handler(route, request):
                 mock['c409'] += 1
                 js(409, {'message': 'does not match'}); return
             mock['text'] = base64.b64decode(b['content']).decode(); mock['exists'] = True; mock['n'] += 1; mock['puts'] += 1
-            js(200, {'content': {'sha': sha()}}); return
+            js(200, {'content': {'sha': sha(), 'size': len(mock['text'].encode())}}); return
+    if url == 'https://api.github.com/repos/o/r/git/blobs/' + sha() and request.method == 'GET':
+        mock['blobs'] = mock.get('blobs', 0) + 1
+        js(200, {'sha': sha(), 'encoding': 'base64', 'content': base64.encodebytes(mock['text'].encode()).decode()}); return
     js(404, {'message': 'Not Found'})
 
 pg_ref = [None]
@@ -210,6 +214,25 @@ with sync_playwright() as p:
     check('J2: unlocked from settings', pg.evaluate('!!ghToken'))
     pg.click('#drawerClose')
 
+    # M. формат файла в GitHub: компактный, по записи на строке, читаемый тем же кодом
+    txt = mock['text']; dj = json.loads(txt)
+    pretty = json.dumps(dj, indent=2, ensure_ascii=False)
+    check('M: file is valid JSON and smaller than the indented form', len(txt) < len(pretty) * 0.85, (len(txt), len(pretty)))
+    lines = txt.split('\n')
+    per_line = all(any(('"id":"%s"' % e['id']) in ln and ln.rstrip(',').startswith('{') and json.loads(ln.rstrip(',')) == e for ln in lines) for e in dj['entries'])
+    check('M: every entry sits on its own line (readable commit history)', per_line)
+    ts = [e['ts'] for e in dj['entries']]
+    check('M: entries are in time order (stable diffs)', ts == sorted(ts), ts)
+    check('M: file size is shown in the GitHub status line', 'КБ' in pg.evaluate("document.getElementById('ghInfo').textContent"), pg.evaluate("document.getElementById('ghInfo').textContent"))
+
+    # M2. файл больше 1 МБ: GitHub отдаёт пустое содержимое, читаем через запасной путь (git/blobs)
+    mock['big'] = True; other_dispatcher_writes('zz-big'); b0 = mock.get('blobs', 0); puts3 = mock['puts']
+    pg.click('#btnMenu'); pg.click('[data-tab=data]'); pg.click('#btnGhSync')
+    wait_js('document.getElementById("loader").hidden', timeout=8000)
+    check('M2: big file read through git/blobs', mock.get('blobs', 0) > b0 and pg.evaluate("state.entries.some(e => e.id === 'zz-big')"), (b0, mock.get('blobs', 0)))
+    check('M2: no data lost and no extra PUT', mock['puts'] == puts3 and pg.evaluate('state.entries.length') == 5, (puts3, mock['puts'], pg.evaluate('state.entries.length')))
+    mock['big'] = False; pg.click('#drawerClose')
+
     # K. CSP: наружу, кроме GitHub, ходить нельзя
     r = pg.evaluate("fetch('https://example.com/').then(() => 'allowed').catch(() => 'blocked')")
     check('K: CSP blocks other hosts', r == 'blocked', r)
@@ -218,7 +241,7 @@ with sync_playwright() as p:
     pg.evaluate('ghRun()'); pg.wait_for_timeout(500)
     pg.click('#btnMenu'); pg.click('[data-tab=data]'); pg.click('#btnGhOff')
     check('L: disconnected, token removed', pg.evaluate('gh.cfg') is None and pg.evaluate("localStorage.getItem('scadalog.gh')") is None)
-    check('L: data kept locally', pg.evaluate('state.entries.length') == 4)
+    check('L: data kept locally', pg.evaluate('state.entries.length') == 5)
     pg.screenshot(path=OUT + '/gh_section.png')
 
     real = [e for e in errs if 'Failed to load resource' not in e and 'net::ERR' not in e and 'example.com' not in e]
