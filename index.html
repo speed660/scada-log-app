@@ -132,6 +132,22 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .map-legend .l2{background:var(--sun-soft);border-color:var(--sun)}
 .map-pan{display:none}
 @media (max-width:860px){.map-pan{display:inline}}
+.map-head .ghost{min-height:34px;padding:0 12px;font-size:14px}
+#mapBlk{display:block;height:auto;font-family:inherit}
+#mapBlk .tc{cursor:pointer}
+#mapBlk .tc rect{fill:var(--soft);stroke:var(--line);stroke-width:.6}
+#mapBlk .tc text{fill:var(--ink);text-anchor:middle;font-size:7.6px;pointer-events:none}
+#mapBlk .tc.nb rect{fill:var(--teal-soft);stroke:var(--teal)}
+#mapBlk .tc:hover rect{stroke:var(--teal);stroke-width:1.2}
+#mapBlk .tc:focus{outline:none}
+#mapBlk .tc:focus-visible rect{stroke:var(--ink);stroke-width:1.6}
+#mapBlk .tc.sel rect{fill:var(--teal);stroke:var(--ink);stroke-width:1.8}
+#mapBlk .tc.sel text{fill:var(--teal-ink);font-weight:700}
+#mapBlk .tb rect{fill:none;stroke:var(--sun);stroke-width:1;stroke-dasharray:2.5 1.5}
+#mapBlk .tb text{fill:var(--sun-ink);text-anchor:middle;font-size:6.4px}
+#mapBlk .lbl{fill:var(--muted);font-size:6.4px;text-anchor:middle}
+.map-legend .l4{background:var(--teal);border-color:var(--ink)}
+.map-legend .l5{border-style:dashed;border-color:var(--sun)}
 .map-legend .l3{border-style:dashed;border-color:var(--muted)}
 #mapCard{margin:12px 16px calc(16px + env(safe-area-inset-bottom,0px));max-width:560px}
 .opt.muted{color:var(--muted);cursor:default}
@@ -406,13 +422,15 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 <button type="button" class="primary fab" id="fab">Записать звонок</button>
 <div class="mapview" id="mapView" role="dialog" aria-modal="true" aria-labelledby="mapTitle" hidden>
   <div class="map-head">
+    <button type="button" class="ghost" id="mapBack" hidden>← Вся схема</button>
     <h2 id="mapTitle">Схема поля</h2>
     <span class="map-sub">схема, не масштаб</span>
     <button type="button" class="x-btn" id="mapClose" aria-label="Закрыть схему"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <p class="map-msg" id="mapMsg"></p>
-  <div class="map-scroll" id="mapScroll"><svg id="mapSvg" role="group" aria-label="Схема блоков поля" hidden></svg></div>
+  <div class="map-scroll" id="mapScroll"><svg id="mapSvg" role="group" aria-label="Схема блоков поля" hidden></svg><svg id="mapBlk" role="group" aria-label="Трекеры блока" hidden></svg></div>
   <div class="map-legend" id="mapLegend" hidden><span><i class="l1"></i>1-я очередь</span><span><i class="l2"></i>2-я очередь</span><span><i class="l3"></i>положение блока не подтверждено</span><span class="map-pan">Схему можно листать вбок</span></div>
+  <div class="map-legend" id="mapLegend2" hidden><span><i class="l4"></i>выбранный трекер</span><span><i class="l1"></i>соседние</span><span><i class="l5"></i>ящик связи блока</span><span>ряд 1 сверху, как в таблице станции; пустое место — нет трекера</span><span class="map-pan">Сетку можно листать вбок</span></div>
   <div class="trk-card" id="mapCard" aria-live="polite" hidden></div>
 </div>
 
@@ -1794,7 +1812,7 @@ $('form').addEventListener('submit', e => { e.preventDefault(); saveEntry(); });
 /* Данные станции лежат в приватном репозитории (map/trackers.json) и держатся только в памяти вкладки:
    «Заблокировать» и отключение GitHub их стирают. В браузере и в публичном репозитории их нет. */
 const TRK_FILE = 'map/trackers.json', TRK_FIXES = 'map/corrections.json';
-let mapLayout = null, mapSel = null, mapErr = '', mapLoading = null;
+let mapLayout = null, mapSel = null, mapErr = '', mapLoading = null, mapZoom = false;
 let trkData = null, trkErr = '', trkLoading = null, trkItems = [], trkActive = -1, trkSel = null;
 const nfmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 async function trkFile(path, optional) {
@@ -1814,7 +1832,7 @@ function trkBuild(d, fx) {
     if (!b || !Number.isInteger(b.n) || !Array.isArray(b.trackers)) continue;
     const nums = new Map(), pos = new Map();
     for (const t of b.trackers) if (Array.isArray(t) && t.length >= 3 && t.slice(0, 3).every(Number.isInteger)) { nums.set(t[0], [t[1], t[2]]); pos.set(t[1] + ',' + t[2], t[0]); }
-    blocks.set(b.n, { n: b.n, phase: b.phase, freq: b.freq, range: b.id_range || '', outer: b.outer || 0, inner: b.inner || 0, deep: b.deep || 0, half: b.half || 0, rows: b.grid_rows || 0, cols: b.grid_cols || 0, nums, pos });
+    blocks.set(b.n, { n: b.n, phase: b.phase, freq: b.freq, range: b.id_range || '', outer: b.outer || 0, inner: b.inner || 0, deep: b.deep || 0, half: b.half || 0, rows: b.grid_rows || 0, cols: b.grid_cols || 0, box: Array.isArray(b.box) && b.box.length >= 2 && b.box.slice(0, 2).every(Number.isInteger) ? b.box : null, nums, pos });
     total += nums.size;
   }
   if (!blocks.size) throw new GhError('В файле трекеров нет блоков', { kind: 'corrupt' });
@@ -1842,7 +1860,7 @@ function trkLoad() {
 }
 function trkClear() {
   trkData = null; trkErr = ''; trkSel = null; trkItems = [];
-  mapLayout = null; mapSel = null; mapErr = ''; closeMap();
+  mapLayout = null; mapSel = null; mapErr = ''; mapZoom = false; closeMap();
   if ($('fTrk')) { $('fTrk').value = ''; closeTrkList(); renderTrk(); }
 }
 /* Разбор запроса. Понимает «13-87», «13 87», «13/87», «блок 13 трекер 87», «трекер 87 блок 13», «BLK13-TRK087», «б13 т87», «13б 87т».
@@ -1999,10 +2017,11 @@ $('trkList').addEventListener('click', e => { const o = e.target.closest('[data-
 document.addEventListener('click', e => {
   const a = e.target.closest('#trkCard [data-act], #trkNote [data-act], #mapCard [data-act], #mapMsg [data-act]');
   if (!a) return;
-  if (a.dataset.act === 'map') openMap(+a.dataset.b, +a.dataset.n || 0);
+  if (a.dataset.act === 'map') openMap(+a.dataset.b, +a.dataset.n || 0, !!a.dataset.n);
+  else if (a.dataset.act === 'zoom') { mapZoom = true; renderMap(); mapSeeSel(); }
   else if (a.dataset.act === 'fill') { closeMap(); $('fLoc').value = a.dataset.loc; $('fLoc').dispatchEvent(new Event('input', { bubbles: true })); toast('Подставлено в «Место»: ' + a.dataset.loc); $('fLoc').focus(); }
   else if (a.dataset.act === 'unlock') ghUnlock();
-  else if (a.dataset.act === 'retry') { mapErr = ''; if (!$('mapView').hidden) openMap(mapSel && mapSel.b, mapSel && mapSel.n); else trkLoad(); }
+  else if (a.dataset.act === 'retry') { mapErr = ''; if (!$('mapView').hidden) openMap(mapSel && mapSel.b, mapSel && mapSel.n, mapZoom); else trkLoad(); }
 });
 
 /* ---------- Схема поля (уровень 1) ---------- */
@@ -2035,14 +2054,16 @@ function mapLoad() {
   renderMap();
   return mapLoading;
 }
-function openMap(b, n) {
+function mapSeeSel() { const g = $(mapZoom ? 'mapBlk' : 'mapSvg').querySelector('.sel'); if (g && g.scrollIntoView) g.scrollIntoView({ block: 'nearest', inline: 'center' }); }
+function openMap(b, n, zoom) {
   mapSel = b ? { b, n: n || 0 } : null;
+  mapZoom = !!(b && zoom);
   $('mapView').hidden = false;
-  mapLoad().then(() => { const g = $('mapSvg').querySelector('.mb.sel'); if (g && g.scrollIntoView) g.scrollIntoView({ block: 'nearest', inline: 'center' }); });
+  mapLoad().then(mapSeeSel);
   renderMap();
   $('mapClose').focus();
 }
-function closeMap() { if ($('mapView')) $('mapView').hidden = true; }
+function closeMap() { if ($('mapView')) { $('mapView').hidden = true; mapZoom = false; } }
 function renderMap() {
   if ($('mapView').hidden) return;
   const msg = $('mapMsg'), svg = $('mapSvg'), card = $('mapCard');
@@ -2054,8 +2075,14 @@ function renderMap() {
   msg.textContent = text;
   if (act) { msg.append(' '); const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'link'; bt.dataset.act = act; bt.textContent = act === 'unlock' ? 'Разблокировать' : 'Повторить'; msg.append(bt); }
   msg.hidden = !text;
-  const ready = !!(mapLayout && trkData && ghToken);
+  const blkSvg = $('mapBlk'), zoomOK = !!(mapZoom && mapSel && trkData && ghToken && trkData.blocks.has(mapSel.b));
+  const ready = !!(mapLayout && trkData && ghToken) && !zoomOK;
+  if (zoomOK) { msg.hidden = true; $('mapTitle').textContent = 'Блок ' + mapSel.b; } else $('mapTitle').textContent = 'Схема поля';
+  $('mapBack').hidden = !zoomOK;
   svg.toggleAttribute('hidden', !ready); $('mapLegend').hidden = !ready; // у SVG нет свойства hidden
+  blkSvg.toggleAttribute('hidden', !zoomOK); $('mapLegend2').hidden = !zoomOK;
+  if (zoomOK) { svg.innerHTML = ''; renderMapBlock(blkSvg, card); return; }
+  blkSvg.innerHTML = '';
   if (!ready) { svg.innerHTML = ''; card.innerHTML = ''; card.hidden = true; return; }
   const L = mapLayout, ys = L.ys;
   const x0 = Math.min(...L.blocks.map(b => b.x)) - 4, y0 = Math.min(...L.blocks.map(b => b.y * ys)) - 4;
@@ -2074,10 +2101,41 @@ function renderMap() {
   if (mapSel && trkData.blocks.has(mapSel.b)) {
     const bl = L.blocks.find(b => b.n === mapSel.b);
     card.innerHTML = trkCardHTML(mapSel.n ? { k: 'trk', b: mapSel.b, n: mapSel.n } : { k: 'block', b: mapSel.b }, true) +
-      (bl && bl.uncertain ? '<p class="trk-warn">Положение этого блока на схеме не подтверждено.</p>' : '');
+      (bl && bl.uncertain ? '<p class="trk-warn">Положение этого блока на схеме не подтверждено.</p>' : '') +
+      `<div class="trk-acts"><button type="button" class="ghost" data-act="zoom">Открыть блок</button></div>`;
     card.hidden = false;
   } else { card.innerHTML = ''; card.hidden = true; }
 }
+const MB_W = 26, MB_H = 22, MB_L = 18, MB_T = 14;
+function renderMapBlock(svg, card) {
+  const b = trkData.blocks.get(mapSel.b), sel = mapSel.n;
+  const rows = Math.max(b.rows, ...[...b.nums.values()].map(v => v[0]), 1), cols = Math.max(b.cols, ...[...b.nums.values()].map(v => v[1]), 1);
+  const at = b.nums.get(sel), nb = new Set();
+  if (at) for (const [dr, dc] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const v = b.pos.get((at[0] + dr) + ',' + (at[1] + dc)); if (v != null) nb.add(v); }
+  const W = MB_L + cols * MB_W + 4, H = MB_T + rows * MB_H + 4;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.style.width = Math.max(W * 1.15, 320) + 'px';
+  let h = '';
+  for (let c = 1; c <= cols; c++) if (c === 1 || c % 5 === 0) h += `<text class="lbl" x="${MB_L + (c - 0.5) * MB_W}" y="9">${c}</text>`;
+  for (let r = 1; r <= rows; r++) h += `<text class="lbl" x="8" y="${MB_T + (r - 0.5) * MB_H + 2.4}">${r}</text>`;
+  const first = sel && at ? sel : (b.nums.size ? Math.min(...b.nums.keys()) : 0);
+  for (const [n, [r, c]] of b.nums) {
+    const x = MB_L + (c - 1) * MB_W, y = MB_T + (r - 1) * MB_H, on = n === sel;
+    h += `<g class="tc${on ? ' sel' : nb.has(n) ? ' nb' : ''}" data-n="${n}" data-r="${r}" data-c="${c}" tabindex="${n === first ? 0 : -1}" role="button" aria-pressed="${on}" aria-label="Трекер ${n}, ряд ${r}, колонка ${c}">` +
+      `<rect x="${x + 0.6}" y="${y + 0.6}" width="${MB_W - 1.2}" height="${MB_H - 1.2}" rx="2"/><text x="${x + MB_W / 2}" y="${y + MB_H / 2 + 2.6}">${n}</text></g>`;
+  }
+  const bx = b.box;
+  if (bx && !b.pos.has(bx[0] + ',' + bx[1])) { const x = MB_L + (bx[1] - 1) * MB_W, y = MB_T + (bx[0] - 1) * MB_H; h += `<g class="tb"><rect x="${x + 0.6}" y="${y + 0.6}" width="${MB_W - 1.2}" height="${MB_H - 1.2}" rx="2"/><text x="${x + MB_W / 2}" y="${y + MB_H / 2 + 2.2}">ящик</text></g>`; }
+  svg.innerHTML = h;
+  card.innerHTML = trkCardHTML(sel ? { k: 'trk', b: b.n, n: sel } : { k: 'block', b: b.n }, true); card.hidden = false;
+}
+function mapPickTrk(g) {
+  if (!g) return;
+  mapSel = { b: mapSel.b, n: +g.dataset.n };
+  renderMap();
+  const again = $('mapBlk').querySelector('.tc.sel'); if (again) again.focus({ preventScroll: true });
+  if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
+}
+function mapBack() { if (!mapZoom) return; mapZoom = false; if (mapSel) mapSel.n = 0; renderMap(); mapSeeSel(); }
 function mapPick(g) {
   if (!g) return;
   mapSel = { b: +g.dataset.n, n: 0 };
@@ -2087,6 +2145,23 @@ function mapPick(g) {
 }
 $('btnMap').onclick = () => openMap();
 $('mapClose').onclick = closeMap;
+$('mapBack').onclick = mapBack;
+$('mapBlk').addEventListener('click', e => mapPickTrk(e.target.closest('.tc')));
+$('mapBlk').addEventListener('keydown', e => {
+  const g = e.target.closest('.tc');
+  if (!g) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); mapPickTrk(g); return; }
+  const d = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[e.key];
+  if (!d) return;
+  e.preventDefault();
+  const b = trkData.blocks.get(mapSel.b); let r = +g.dataset.r, c = +g.dataset.c;
+  for (let i = 0; i < 60; i++) { // перепрыгиваем пустые места до ближайшего трекера в этом направлении
+    r += d[0]; c += d[1];
+    const v = b.pos.get(r + ',' + c);
+    if (v != null) { const t = $('mapBlk').querySelector('.tc[data-n="' + v + '"]'); if (t) { g.tabIndex = -1; t.tabIndex = 0; t.focus(); } return; }
+    if (r < 1 || c < 1 || r > b.rows + 1 || c > b.cols + 1) return;
+  }
+});
 $('mapSvg').addEventListener('click', e => mapPick(e.target.closest('.mb')));
 $('mapSvg').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); mapPick(e.target.closest('.mb')); } });
 
@@ -2331,7 +2406,7 @@ $('btnSaveLists').onclick = () => {
 document.addEventListener('keydown', e => {
   if (!$('loader').hidden || !$('passDlg').hidden) return;
   if (e.key === 'Escape') {
-    if (!$('mapView').hidden) { closeMap(); return; }
+    if (!$('mapView').hidden) { if (mapZoom) mapBack(); else closeMap(); return; }
     if (!$('drawer').hidden) { closeDrawer(); return; }
     if ($('composer').classList.contains('open')) { closeSheet(); return; }
     if (editingId || linkingId) { resetComposer(); return; }

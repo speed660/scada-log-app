@@ -1,6 +1,6 @@
 {"app":"scada-map-data","version":1,"source":"ВЫМЫШЛЕННЫЕ ДАННЫЕ ДЛЯ ТЕСТОВ, не станция","blocks":[
 {"n":1,"phase":2,"freq":4242,"id_range":"1-12","declared":12,"outer":2,"inner":3,"deep":7,"half":0,"grid_rows":3,"grid_cols":4,"count":12,
  "trackers":[[1,1,1],[2,1,2],[3,1,3],[4,1,4],[5,2,1],[6,2,2],[7,2,3],[8,2,4],[9,3,1],[10,3,2],[11,3,3],[12,3,4]]},
-{"n":2,"phase":1,"freq":4343,"id_range":"1-6","declared":6,"outer":1,"inner":2,"deep":2,"half":1,"grid_rows":3,"grid_cols":3,"count":7,
+{"n":2,"phase":1,"freq":4343,"id_range":"1-6","declared":6,"outer":1,"inner":2,"deep":2,"half":1,"grid_rows":3,"grid_cols":3,"box":[3,3],"count":7,
  "trackers":[[1,1,1],[2,1,2],[3,1,3],[4,2,1],[5,2,3],[6,2,2],[1010,3,1]]}
 ],"issues":[],"notes":[]}

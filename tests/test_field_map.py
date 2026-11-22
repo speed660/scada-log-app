@@ -106,15 +106,37 @@ with sync_playwright() as p:
     check('D: схема закрылась', not pg.is_visible('#mapView'))
     check('D: место подставлено', pg.input_value('#fLoc') == 'Блок 1', pg.input_value('#fLoc'))
 
-    # E. из поиска трекера
+    # E. из поиска трекера: сразу открывается сетка блока
     if pg.is_visible('#fab') and not pg.is_visible('#fTrk'): pg.click('#fab')
     pg.fill('#fTrk', '1-6')
     check('E: в карточке трекера есть «Показать на схеме»', pg.is_visible('#trkCard [data-act=map]'))
     pg.click('#trkCard [data-act=map]')
-    check('E: схема открыта на этом блоке', pg.is_visible('#mapView') and pg.evaluate("document.querySelector('#mapSvg .mb.sel').dataset.n") == '1')
+    check('E: открыт блок 1, трекер 6 выбран', pg.is_visible('#mapBlk') and pg.evaluate("document.querySelector('#mapBlk .tc.sel').dataset.n") == '6' and pg.inner_text('#mapTitle') == 'Блок 1')
     check('E: карточка про трекер', 'трекер 6' in pg.inner_text('#mapCard') and 'ряд 2, колонка 2' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
-    pg.click('#mapClose')
-    check('E: закрыта кнопкой', not pg.is_visible('#mapView'))
+    check('E: в сетке 12 трекеров', pg.locator('#mapBlk .tc').count() == 12)
+    check('E: соседи подсвечены (5, 7, 2, 10)', sorted(pg.evaluate("[...document.querySelectorAll('#mapBlk .tc.nb')].map(g => +g.dataset.n)")) == [2, 5, 7, 10])
+    check('E: кнопка «Вся схема» видна, поле скрыто', pg.is_visible('#mapBack') and not pg.is_visible('#mapSvg'))
+    pg.screenshot(path=OUT + '/field_block.png')
+
+    # E2. выбор другого трекера кликом и стрелками
+    pg.click('#mapBlk .tc[data-n="11"]')
+    check('E2: выбран 11', pg.evaluate("document.querySelector('#mapBlk .tc.sel').dataset.n") == '11' and 'трекер 11' in pg.inner_text('#mapCard'))
+    pg.press('#mapBlk .tc.sel', 'ArrowLeft')
+    check('E2: стрелка влево — фокус на 10', pg.evaluate("document.activeElement.dataset.n") == '10')
+    pg.press('#mapBlk .tc[data-n="10"]', 'Enter')
+    check('E2: Enter выбирает 10', pg.evaluate("document.querySelector('#mapBlk .tc.sel').dataset.n") == '10')
+
+    # E3. «Вся схема» и Escape
+    pg.click('#mapBack')
+    check('E3: вернулись к схеме поля, блок 1 отмечен', pg.is_visible('#mapSvg') and not pg.is_visible('#mapBlk') and pg.evaluate("document.querySelector('#mapSvg .mb.sel').dataset.n") == '1' and pg.inner_text('#mapTitle') == 'Схема поля')
+    pg.click('#mapSvg .mb[data-n="2"]'); pg.click('#mapCard [data-act=zoom]')
+    check('E3: «Открыть блок» показывает блок 2 без выбранного трекера', pg.is_visible('#mapBlk') and pg.locator('#mapBlk .tc').count() == 7 and pg.locator('#mapBlk .tc.sel').count() == 0 and 'Блок 2' in pg.inner_text('#mapCard'))
+    check('E3: ящик связи нарисован в свободной ячейке', pg.locator('#mapBlk .tb').count() == 1)
+    check('E3: пустое место не нарисовано трекером', pg.locator('#mapBlk .tc').count() == 7)
+    pg.press('body', 'Escape')
+    check('E3: Escape возвращает к схеме, не закрывая её', pg.is_visible('#mapView') and pg.is_visible('#mapSvg'))
+    pg.press('body', 'Escape')
+    check('E3: второй Escape закрывает', not pg.is_visible('#mapView'))
 
     # F. данные не попадают в хранилище и журнал
     ls = pg.evaluate('JSON.stringify(Object.assign({}, localStorage))') + pg.evaluate('JSON.stringify(Object.assign({}, sessionStorage))')
@@ -151,6 +173,11 @@ with sync_playwright() as p:
     pg.click('#btnMap'); pg.wait_for_selector('#mapSvg:not([hidden])', timeout=5000)
     pg.click('#mapSvg .mb[data-n="1"]'); pg.wait_for_timeout(300)
     check('I: карточка видна', pg.is_visible('#mapCard'))
+    pg.click('#mapCard [data-act=zoom]'); pg.wait_for_timeout(300)
+    check('I: сетка блока на телефоне видна и листается вбок', pg.is_visible('#mapBlk') and pg.evaluate("document.getElementById('mapScroll').scrollWidth >= document.getElementById('mapScroll').clientWidth"))
+    check('I: страница не уехала вбок при сетке', pg.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'))
+    pg.screenshot(path=OUT + '/field_block_mobile.png')
+    pg.click('#mapBack')
     check('I: страница под схемой не уехала вбок', pg.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'))
     pg.screenshot(path=OUT + '/field_map_mobile.png')
 
