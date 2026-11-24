@@ -1098,7 +1098,7 @@ function ghRun() {
   clearTimeout(gh.timer); clearTimeout(gh.retryTimer);
   gh.running = (async () => {
     try {
-      do { gh.again = false; await ghSyncOnce(); } while (gh.again);
+      do { gh.again = false; if (JOURNAL_ON) await ghSyncOnce(); } while (gh.again); // журнал скрыт: scada-log.json не читаем и не пишем, нужны только данные станции
       gh.err = null; gh.halted = false; gh.retryMs = 0; gh.lastOk = new Date();
       if (!trkErr) trkLoad().then(() => { if (!$('mapView').hidden) mapLoad(); }); // данные станции подтягиваем в фоне; сбой там не ломает журнал, после ошибки повтор только по кнопке
       return { ok: true };
@@ -1116,13 +1116,18 @@ function ghRun() {
 }
 // Любое изменение данных: отправка через 1,5 с после последней правки, а не на каждый клик.
 function ghSchedule(delay = 1500) {
-  if (!gh.cfg) return;
+  if (!gh.cfg || !JOURNAL_ON) return;
   gh.dirty = true; renderGh();
   if (gh.halted || !ghToken) return;
   clearTimeout(gh.timer); gh.timer = setTimeout(ghRun, delay);
 }
 function ghStatus() {
   if (!ghToken) return { text: 'GitHub: заблокирован, нужен пароль' + (gh.dirty ? ', есть неотправленное' : ''), cls: 'warn' };
+  if (!JOURNAL_ON) {
+    if (trkData) return { text: 'GitHub: данные станции загружены', cls: 'ok' };
+    if (trkErr) return { text: 'GitHub: ' + trkErr, cls: 'err' };
+    return { text: 'GitHub: загружаю данные станции…', cls: 'busy' };
+  }
   if (gh.running) return { text: 'GitHub: сохраняю…', cls: 'busy' };
   if (gh.err) {
     const soft = ['net', 'rate', 'conflict'].includes(gh.err.kind);
@@ -1213,7 +1218,10 @@ function passDialog(mode, work) {
 }
 $('passDlg').addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); $('pdCancel').click(); } });
 
-const ghLoad = () => runBlocking('Загружаю журнал из GitHub…', async () => { gh.halted = false; const r = await ghRun(); if (!r.ok) throw r.err; }, { closeLabel: 'Работать без связи' });
+const ghLoad = () => runBlocking(JOURNAL_ON ? 'Загружаю журнал из GitHub…' : 'Загружаю данные станции…', async () => {
+  gh.halted = false; const r = await ghRun(); if (!r.ok) throw r.err;
+  if (!JOURNAL_ON) await trkLoad(); // без журнала ждём сами данные станции; ошибку покажет карта с кнопкой «Повторить»
+}, { closeLabel: 'Работать без связи' });
 async function ghUnlock() {
   if (!gh.cfg || ghToken) return true;
   const ok = await passDialog('unlock', async p => { ghToken = await openToken(gh.sealed, p, gh.cfg); });
@@ -1879,13 +1887,14 @@ async function trkFile(path, optional) {
 }
 function trkBuild(d, fx) {
   if (!d || d.app !== 'scada-map-data' || !Array.isArray(d.blocks)) throw new GhError('Файл трекеров в другом формате', { kind: 'corrupt' });
-  const blocks = new Map();
+  const blocks = new Map(), cnt = v => (Number.isInteger(v) && v >= 0 ? v : 0);
   let total = 0;
   for (const b of d.blocks) {
     if (!b || !Number.isInteger(b.n) || !Array.isArray(b.trackers)) continue;
     const nums = new Map(), pos = new Map();
     for (const t of b.trackers) if (Array.isArray(t) && t.length >= 3 && t.slice(0, 3).every(Number.isInteger)) { nums.set(t[0], [t[1], t[2]]); pos.set(t[1] + ',' + t[2], t[0]); }
-    blocks.set(b.n, { n: b.n, phase: b.phase, freq: b.freq, range: b.id_range || '', outer: b.outer || 0, inner: b.inner || 0, deep: b.deep || 0, half: b.half || 0, rows: b.grid_rows || 0, cols: b.grid_cols || 0, box: Array.isArray(b.box) && b.box.length >= 2 && b.box.slice(0, 2).every(Number.isInteger) ? b.box : null, nums, pos });
+    // В файл могут писать все, у кого есть токен, поэтому в разметку попадают только проверенные числа и строки.
+    blocks.set(b.n, { n: b.n, phase: b.phase === 1 || b.phase === 2 ? b.phase : 0, freq: b.freq == null ? '' : String(b.freq), range: b.id_range == null ? '' : String(b.id_range), outer: cnt(b.outer), inner: cnt(b.inner), deep: cnt(b.deep), half: cnt(b.half), rows: cnt(b.grid_rows), cols: cnt(b.grid_cols), box: Array.isArray(b.box) && b.box.length >= 2 && b.box.slice(0, 2).every(Number.isInteger) ? b.box : null, nums, pos });
     total += nums.size;
   }
   if (!blocks.size) throw new GhError('В файле трекеров нет блоков', { kind: 'corrupt' });
@@ -1906,7 +1915,7 @@ function trkLoad() {
       trkData = trkBuild(d, fx);
       return true;
     } catch (e) { trkData = null; trkErr = (e && e.message) || 'неизвестная ошибка'; return false; }
-    finally { trkLoading = null; renderTrk(); }
+    finally { trkLoading = null; renderTrk(); renderGh(); }
   })();
   renderTrk();
   return trkLoading;
