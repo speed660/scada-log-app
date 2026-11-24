@@ -42,6 +42,10 @@ a{color:inherit}
 .file-state i{width:8px;height:8px;border-radius:50%;background:var(--sun);flex:0 0 auto}
 .file-state.ok i{background:var(--ok)}
 .file-state.warn{color:var(--sun-ink)}
+.no-journal main.layout,.no-journal .fab,.no-journal #composer,.no-journal #btnJournal,.no-journal #fileState,.no-journal [data-tab=workers],.no-journal [data-tab=lists],.no-journal #tab-workers,.no-journal #tab-lists,.no-journal #tab-data>section:not(#ghSection),.no-journal #mapClose,.no-journal #scadaClose,.no-journal .scada-journal{display:none!important}
+.map-find{position:relative;margin:12px 16px 0;max-width:520px}
+.map-find input{width:100%}
+.map-find .who-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:6}
 .top{flex-wrap:wrap}
 .sections{order:9;flex:1 1 100%;display:flex;gap:6px;margin-top:-2px;overflow-x:auto}
 .sec{border:1px solid transparent;border-radius:999px;min-height:36px;padding:0 16px;font-weight:600;font-size:15px;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;text-decoration:none;white-space:nowrap;background:none;cursor:pointer}
@@ -453,9 +457,11 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
     <button type="button" class="x-btn" id="scadaClose" aria-label="Закрыть раздел SCADA"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="scada-body">
+    <div class="scada-journal">
     <h3>Уже есть</h3>
     <p>Расчёт угла по солнцу в форме звонка и сверка расчёта с тем, что показывала SCADA.</p>
     <div class="btn-row"><button type="button" class="primary" id="btnScadaCal">Открыть сверку угла</button></div>
+    </div>
     <h3>В планах</h3>
     <ul><li>Массовая смена угла и режима трекеров (отложено, сначала обсудим).</li><li>Живые статусы трекеров на карте поля.</li></ul>
     <p>Прямое управление SCADA из этого сайта пока не работает: SCADA в закрытой сети станции.</p>
@@ -470,6 +476,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
     <button type="button" class="x-btn" id="mapClose" aria-label="Закрыть схему"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <p class="map-msg" id="mapMsg"></p>
+  <div class="map-find"><input id="mapFind" type="search" placeholder="Найти трекер: 13-87 или блок 13" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Найти трекер или блок" disabled><div class="who-list" id="mapFindList" role="listbox" hidden></div></div>
   <div class="map-scroll" id="mapScroll"><svg id="mapSvg" role="group" aria-label="Схема блоков поля" hidden></svg><svg id="mapBlk" role="group" aria-label="Трекеры блока" hidden></svg></div>
   <div class="map-legend" id="mapLegend" hidden><span><i class="l1"></i>1-я очередь</span><span><i class="l2"></i>2-я очередь</span><span id="mapUnsure"><i class="l3"></i>положение блока не подтверждено</span><span><i class="l6"></i>дороги</span><span><i class="l7"></i>ящик связи</span><span class="map-pan">Схему можно листать вбок</span></div>
   <div class="map-legend" id="mapLegend2" hidden><span><i class="l4"></i>выбранный трекер</span><span><i class="l1"></i>соседние</span><span><i class="l5"></i>ящик связи блока</span><span>ряд 1 сверху, как в таблице станции; пустое место — нет трекера</span><span class="map-pan">Сетку можно листать вбок</span></div>
@@ -633,6 +640,10 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
+// Страница диспетчера (журнал звонков, работники, Excel, резервные копии, настройки формы) временно скрыта до перехода на сервер.
+// Код и логика на месте: адрес с ?journal=1 возвращает всё как было.
+const JOURNAL_ON = /[?&]journal=1(&|$)/.test(location.search);
+document.documentElement.classList.toggle('no-journal', !JOURNAL_ON);
 const LS_KEY = 'scadalog.v2';
 const LS_OLD = 'worklog.v1';
 const LS_BACKUP = 'scadalog.lastBackup';
@@ -1989,7 +2000,7 @@ function trkCardHTML(it, inMap) {
       rows.push(`<dt>Статус</dt><dd>такого номера нет в таблице блока (трекеров ${b.nums.size}${b.range ? ', номера ' + esc(b.range) : ''})</dd>`, `<dt>Канал связи</dt><dd>${esc(b.freq)}</dd>`);
     }
   }
-  acts = `<div class="trk-acts"><button type="button" class="ghost" data-act="fill" data-loc="${esc(loc)}">Подставить в «Место»</button>` +
+  acts = `<div class="trk-acts">` + (JOURNAL_ON ? `<button type="button" class="ghost" data-act="fill" data-loc="${esc(loc)}">Подставить в «Место»</button>` : '') +
     (inMap ? '' : ` <button type="button" class="ghost" data-act="map" data-b="${b.n}"${it.k === 'trk' ? ` data-n="${it.n}"` : ''}>Показать на схеме</button>`) + '</div>';
   return `<h4>${esc(head)}${phase ? `<small>${phase}</small>` : ''}</h4><dl>${rows.join('')}</dl>${warn}${foot}${acts}`;
 }
@@ -2008,17 +2019,20 @@ function renderTrk() {
   if (trkSel && trkData) { card.innerHTML = trkCardHTML(trkSel); card.hidden = !card.innerHTML; } else { card.innerHTML = ''; card.hidden = true; }
 }
 function closeTrkList() { $('trkList').hidden = true; $('fTrk').setAttribute('aria-expanded', 'false'); trkActive = -1; }
-function drawTrkList() {
-  $('trkList').innerHTML = trkItems.map((it, i) => {
-    if (it.k === 'block') return `<div class="opt${i === trkActive ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b}</b><small>канал ${esc(trkData.blocks.get(it.b).freq)}</small></div>`;
+function trkRowsHTML(items, active) {
+  return items.map((it, i) => {
+    if (it.k === 'block') return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b}</b><small>канал ${esc(trkData.blocks.get(it.b).freq)}</small></div>`;
     if (it.k === 'trk') {
       const b = trkData.blocks.get(it.b), pos = b.nums.get(it.n);
-      return `<div class="opt${i === trkActive ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · трекер ${it.n}</b><small>${pos ? 'ряд ' + pos[0] + ', колонка ' + pos[1] : 'нет в таблице'}</small></div>`;
+      return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · трекер ${it.n}</b><small>${pos ? 'ряд ' + pos[0] + ', колонка ' + pos[1] : 'нет в таблице'}</small></div>`;
     }
     const t = it.k === 'more' ? `Трекер ${it.n} есть ещё в блоках: ${it.c}. Добавь номер блока`
       : it.k === 'none' ? `Трекера ${it.n} нет ни в одном блоке` : it.k === 'nob' ? `Блока ${it.b} нет (блоки ${it.r})` : 'Не понял. Пример: 13-87 или блок 13 трекер 87';
     return `<div class="opt muted" role="option" aria-disabled="true">${esc(t)}</div>`;
   }).join('');
+}
+function drawTrkList() {
+  $('trkList').innerHTML = trkRowsHTML(trkItems, trkActive);
   $('trkList').hidden = !trkItems.length; $('fTrk').setAttribute('aria-expanded', String(!!trkItems.length));
 }
 function onTrkInput() {
@@ -2166,15 +2180,17 @@ function openMap(b, n, zoom) {
   renderMap();
   $('mapClose').focus();
 }
-function closeMap() { if ($('mapView')) { $('mapView').hidden = true; mapZoom = false; if (typeof markSection === 'function' && $('btnScada')) markSection(); } }
+function closeMap() { if ($('mapView')) { $('mapView').hidden = true; mapZoom = false; if (typeof markSection === 'function' && $('btnScada')) { markSection(); ensureHome(); } } }
 function renderMap() {
   if ($('mapView').hidden) return;
   const msg = $('mapMsg'), svg = $('mapSvg'), card = $('mapCard');
   let text = '', act = '';
-  if (!gh.cfg) text = 'Схема использует данные станции из приватного репозитория. Подключи GitHub в меню «Данные».';
+  if (!gh.cfg) text = 'Схема использует данные станции из приватного репозитория. Подключи GitHub: кнопка «Меню» → «' + (JOURNAL_ON ? 'Данные' : 'Доступ к данным') + '».';
   else if (!ghToken) { text = 'GitHub заблокирован. Разблокируй, чтобы открыть схему.'; act = 'unlock'; }
   else if (mapLoading || trkLoading) text = 'Загружаю схему…';
   else if (mapErr) { text = 'Не удалось загрузить схему: ' + mapErr + '.'; act = 'retry'; }
+  const fnd = $('mapFind'); fnd.disabled = !(trkData && ghToken);
+  if (fnd.disabled && fnd.value) { fnd.value = ''; mapFindDraw(); }
   msg.textContent = text;
   if (act) { msg.append(' '); const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'link'; bt.dataset.act = act; bt.textContent = act === 'unlock' ? 'Разблокировать' : 'Повторить'; msg.append(bt); }
   msg.hidden = !text;
@@ -2234,6 +2250,24 @@ function renderMapBlock(svg, card) {
   svg.innerHTML = h;
   card.innerHTML = trkCardHTML(sel ? { k: 'trk', b: b.n, n: sel } : { k: 'block', b: b.n }, true); card.hidden = false;
 }
+let mapFindItems = [];
+function mapFindDraw() {
+  const q = $('mapFind').value.trim();
+  mapFindItems = q && trkData ? trkResolve(q) : [];
+  if (q && trkData && !mapFindItems.length) mapFindItems = [{ k: 'hint' }];
+  $('mapFindList').innerHTML = trkRowsHTML(mapFindItems, mapFindItems.findIndex(trkSelectable));
+  $('mapFindList').hidden = !mapFindItems.length;
+}
+function mapFindChoose(i) {
+  const it = mapFindItems[i];
+  if (!trkSelectable(it)) return;
+  $('mapFind').value = ''; mapFindItems = []; $('mapFindList').hidden = true;
+  openMap(it.b, it.k === 'trk' ? it.n : 0, it.k === 'trk');
+}
+$('mapFind').addEventListener('input', mapFindDraw);
+$('mapFind').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const i = mapFindItems.findIndex(trkSelectable); if (i >= 0) mapFindChoose(i); } else if (e.key === 'Escape' && $('mapFind').value) { e.stopPropagation(); $('mapFind').value = ''; mapFindDraw(); } });
+$('mapFindList').addEventListener('mousedown', e => e.preventDefault());
+$('mapFindList').addEventListener('click', e => { const o = e.target.closest('[data-i]'); if (o) mapFindChoose(+o.dataset.i); });
 function mapPickTrk(g) {
   if (!g) return;
   mapSel = { b: mapSel.b, n: +g.dataset.n };
@@ -2257,8 +2291,9 @@ function markSection() {
   document.body.classList.toggle('in-sec', cur !== 'btnJournal');
   document.documentElement.style.setProperty('--toph', document.querySelector('header.top').offsetHeight + 'px');
 }
-function closeScada() { $('scadaView').hidden = true; markSection(); }
-function openScada() { closeMap(); closeSheet(); $('scadaView').hidden = false; markSection(); }
+function ensureHome() { if (!JOURNAL_ON && $('mapView').hidden && $('scadaView').hidden) openMap(mapSel && mapSel.b, mapSel && mapSel.n, mapZoom); }
+function closeScada() { $('scadaView').hidden = true; markSection(); ensureHome(); }
+function openScada() { closeSheet(); $('mapView').hidden = true; mapZoom = false; $('scadaView').hidden = false; markSection(); }
 $('btnScada').onclick = openScada;
 $('scadaClose').onclick = closeScada;
 $('btnScadaCal').onclick = () => { closeScada(); openDrawer('lists'); };
@@ -2527,7 +2562,7 @@ document.addEventListener('keydown', e => {
   if (!$('loader').hidden || !$('passDlg').hidden) return;
   if (e.key === 'Escape') {
     if (!$('scadaView').hidden) { closeScada(); return; }
-    if (!$('mapView').hidden) { if (mapZoom) mapBack(); else closeMap(); return; }
+    if (!$('mapView').hidden) { if (mapZoom) mapBack(); else if (JOURNAL_ON) closeMap(); return; }
     if (!$('drawer').hidden) { closeDrawer(); return; }
     if ($('composer').classList.contains('open')) { closeSheet(); return; }
     if (editingId || linkingId) { resetComposer(); return; }
@@ -2558,6 +2593,13 @@ window.addEventListener('beforeunload', e => { if (ghReady() && (gh.dirty || gh.
     else { const old = localStorage.getItem(LS_OLD); if (old) absorb(parseData(JSON.parse(old))); }
   } catch (e) { console.warn(e); }
   ghLoadCfg(); resetComposer(); updateFileUI(); render(); renderGhSection();
+  if (!JOURNAL_ON) {
+    curTab = 'data';
+    document.querySelector('.brand').textContent = 'Карта станции';
+    document.querySelector('[data-tab=data]').textContent = 'Доступ к данным';
+    const gn = document.querySelector('#ghForm .note'); if (gn) gn.textContent = 'Данные станции (схема поля и таблицы) лежат в приватном репозитории GitHub. Укажи репозиторий и токен: токен шифруется паролем и хранится только на этом устройстве.';
+    openMap();
+  }
   setInterval(() => { // «сколько прошло», линия текущего времени и время в форме
     if (document.hidden) return;
     render();
@@ -2570,7 +2612,7 @@ window.addEventListener('beforeunload', e => { if (ghReady() && (gh.dirty || gh.
       const ok = await passDialog('set', async p => saveGhCfg(await sealToken(ghToken, p, gh.cfg)));
       toast(ok ? 'Токен зашифрован' : 'Токен работает до закрытия страницы');
     }
-    if (ghReady()) ghLoad(); else if (gh.cfg) ghUnlock();
+    if (ghReady()) ghLoad(); else if (gh.cfg && JOURNAL_ON) ghUnlock(); // без страницы диспетчера пароль спрашиваем только когда нужна схема
   })();
   if (!FS_OK) return;
   try {

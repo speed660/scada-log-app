@@ -17,7 +17,7 @@ with sync_playwright() as p:
     pg.on('console', lambda m: errs.append(m.type + ': ' + m.text) if m.type in ('error', 'warning') else None)
     pg.on('pageerror', lambda e: errs.append('PAGEERROR ' + str(e)))
     pg.clock.install(time='2026-10-13T11:02:00+05:00')
-    pg.goto('file://' + F)
+    pg.goto('file://' + F + '?journal=1')
     pg.wait_for_timeout(300)
 
     # ---- 1. иконки по центру ----
@@ -169,7 +169,7 @@ with sync_playwright() as p:
     m.set_viewport_size({'width': 390, 'height': 800})
     m.on('console', lambda x: errs.append('mobile ' + x.type + ': ' + x.text) if x.type in ('error', 'warning') else None)
     m.on('pageerror', lambda e: errs.append('mobile PAGEERROR ' + str(e)))
-    m.goto('file://' + F)
+    m.goto('file://' + F + '?journal=1')
     m.wait_for_timeout(300)
     m.screenshot(path=OUT + '/mobile_home.png')
     m.click('#fab'); m.wait_for_timeout(400)

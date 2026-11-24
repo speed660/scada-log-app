@@ -52,7 +52,7 @@ with sync_playwright() as p:
 
     # ---------- ссылка из журнала ----------
     for w, wide in ((1280, False), (360, False), (360, True), (320, True)):
-        c = br.new_context(viewport={'width': w, 'height': 800}); j = c.new_page(); j.goto('file://' + APP)
+        c = br.new_context(viewport={'width': w, 'height': 800}); j = c.new_page(); j.goto('file://' + APP + '?journal=1')
         if wide: j.add_style_tag(content="html,body,button,input,select,textarea{font-family:'DejaVu Sans',sans-serif !important}")  # самый широкий из обычных шрифтов, как на сервере проверок
         tag = f'{w} px' + (', широкий шрифт' if wide else '')
         check(f'журнал: ссылка «Учебник» в шапке видна и ведёт в uchebnik/ ({tag})', j.is_visible('#linkBook') and j.get_attribute('#linkBook', 'href') == 'uchebnik/')

@@ -42,7 +42,7 @@ with sync_playwright() as p:
     pg.on('console', lambda m: errs.append(m.text) if m.type in ('error', 'warning') else None)
     pg.on('pageerror', lambda e: errs.append('PAGEERROR ' + str(e)))
     pg.clock.install(time='2026-10-26T17:30:00+05:00')
-    pg.goto('file://' + APP); pg.wait_for_timeout(300)
+    pg.goto('file://' + APP + '?journal=1'); pg.wait_for_timeout(300)
 
     # ---------- 1. геометрия трекера против независимого перебора ----------
     cases = [(el, az, sk) for el in (5, 15, 30, 50, 70) for az in (80, 100, 130, 160, 180, 200, 230, 260, 280) for sk in (-30, -10, 0, 15, 35)]

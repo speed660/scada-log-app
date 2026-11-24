@@ -7,7 +7,7 @@ ME_SCRIPT = "try{localStorage.setItem('scadalog.me','Тест-диспетчер
 
 
 import http.server, shutil, threading
-def serve_app(app=None):
+def serve_app(app=None, journal=True):
     """Отдаёт журнал по http://127.0.0.1 и возвращает адрес. Тесты с перезагрузкой страницы открывают журнал так, а не через file://:
     у file:// хранилище браузера в Chromium иногда пропадает при перезагрузке, и проверка падала сама по себе (примерно раз в четыре запуска)."""
     root = tempfile.mkdtemp(prefix='site-', dir=OUT)
@@ -17,4 +17,4 @@ def serve_app(app=None):
         def log_message(self, *a): pass
     srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    return f'http://127.0.0.1:{srv.server_address[1]}/index.html'
+    return f'http://127.0.0.1:{srv.server_address[1]}/index.html' + ('?journal=1' if journal else '')
