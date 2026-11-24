@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
+<title>Журнал диспетчера</title>
+<style>
+/*@CSS@*/
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">Журнал диспетчера</div>
+  <button type="button" class="file-state" id="fileState"><i></i><span id="fileStateText"></span></button>
+  <button type="button" class="menu-btn" id="btnMenu">Меню</button>
+  <nav class="sections" id="sections" aria-label="Разделы сайта">
+    <button type="button" class="sec on" id="btnJournal" aria-current="page">Журнал</button>
+    <button type="button" class="sec" id="btnMap">Карта</button>
+    <button type="button" class="sec" id="btnScada">SCADA</button>
+    <a class="sec" id="linkBook" href="uchebnik/">Учебник</a>
+  </nav>
+</header>
+
+<main class="layout">
+  <aside class="composer" id="composer" aria-label="Новый звонок">
+    <div class="composer-head">
+      <h2 id="cTitle">Новый звонок</h2>
+      <button type="button" class="link" id="btnCancelEdit" hidden>Отмена</button>
+      <button type="button" class="sheet-close" id="btnSheetClose" aria-label="Закрыть"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <form id="form" autocomplete="off">
+      <div class="field">
+        <label for="fWho">Кто звонил</label>
+        <div class="who">
+          <div class="who-chip" id="whoChip" hidden><span id="whoChipText"></span><button type="button" id="whoClear" aria-label="Выбрать другого"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <input id="fWho" placeholder="Имя или номер телефона" role="combobox" aria-expanded="false" aria-controls="whoList" aria-autocomplete="list">
+          <div class="who-list" id="whoList" role="listbox" hidden></div>
+        </div>
+        <div class="new-worker" id="newWorker" hidden>
+          <div class="nw-head"><span>Новый работник в базе</span><button type="button" class="link" id="nwCancel">Отмена</button></div>
+          <input id="nwName" placeholder="Имя и фамилия">
+          <input id="nwPhone" placeholder="+998 90 123 45 67" inputmode="tel" autocomplete="off">
+        </div>
+      </div>
+      <div class="field"><span class="lbl">Устройство</span><div class="pick" id="pType"></div></div>
+      <div class="field trk">
+        <label for="fTrk">Найти трекер</label>
+        <div class="who">
+          <input id="fTrk" placeholder="13-87 или блок 13 трекер 87" role="combobox" aria-expanded="false" aria-controls="trkList" aria-autocomplete="list" autocomplete="off" inputmode="text" disabled>
+          <div class="who-list" id="trkList" role="listbox" hidden></div>
+        </div>
+        <div class="trk-card" id="trkCard" aria-live="polite" hidden></div>
+        <p class="trk-note" id="trkNote"></p>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="fDev">Номер</label><input id="fDev" list="dlDev" placeholder="TCU-045"></div>
+        <div class="field"><label for="fLoc">Место</label><input id="fLoc" list="dlLoc" placeholder="Блок 3, ряд 14"></div>
+      </div>
+      <div class="field"><span class="lbl">Что просили</span><div class="pick" id="pAction"></div></div>
+      <div class="field" id="angleGroup" hidden><label for="fAngle">Угол наклона, °</label><input id="fAngle" inputmode="decimal" placeholder="30"><div class="solar" id="solar" aria-live="polite"></div></div>
+      <div class="field"><label for="fTs">Время звонка</label><input id="fTs" type="datetime-local"></div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="fRestore"> Потом вернуть в исходное состояние</label>
+        <div class="orig" id="origGroup" hidden><input id="fOrig" list="dlOrig" placeholder="Каким было: авто, угол 0°…" aria-label="Исходное состояние"></div>
+      </div>
+      <div class="field"><label for="fNotes">Примечание</label><textarea id="fNotes" rows="2" placeholder="Причина, детали"></textarea></div>
+      <div class="field"><label for="fBy">Диспетчер, кто записывает</label><input id="fBy" list="dlBy" placeholder="Ваше имя" autocomplete="off" maxlength="60"></div>
+      <button type="submit" class="primary" id="btnSave">Записать</button>
+      <p class="hint">Ctrl+Enter, чтобы записать</p>
+    </form>
+  </aside>
+
+  <section aria-label="Звонки за день">
+    <div class="day-nav">
+      <button type="button" class="nav-arrow" id="prevDay" aria-label="Предыдущий день"><svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="day-title"><h1 id="dayTitle"></h1><p id="daySub"></p></div>
+      <button type="button" class="nav-arrow" id="nextDay" aria-label="Следующий день"><svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      <div class="day-tools">
+        <button type="button" class="ghost" id="btnToday">Сегодня</button>
+        <input type="date" id="dayPick" aria-label="Выбрать дату">
+      </div>
+    </div>
+    <div class="tape">
+      <div class="tape-track" id="tapeTrack" aria-label="Звонки на шкале суток"></div>
+      <div class="tape-hours" id="tapeHours"></div>
+    </div>
+    <div class="waiting" id="waiting" hidden><h3 id="waitTitle"></h3><div id="waitList"></div></div>
+    <ol class="calls" id="calls"></ol>
+    <div class="empty" id="empty" hidden></div>
+  </section>
+</main>
+
+<button type="button" class="primary fab" id="fab">Записать звонок</button>
+<div class="mapview" id="scadaView" role="dialog" aria-modal="true" aria-labelledby="scadaTitle" hidden>
+  <div class="map-head">
+    <h2 id="scadaTitle">SCADA</h2>
+    <span class="map-sub">всё, что связано со SCADA станции</span>
+    <button type="button" class="x-btn" id="scadaClose" aria-label="Закрыть раздел SCADA"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="scada-body">
+    <div class="scada-journal">
+    <h3>Уже есть</h3>
+    <p>Расчёт угла по солнцу в форме звонка и сверка расчёта с тем, что показывала SCADA.</p>
+    <div class="btn-row"><button type="button" class="primary" id="btnScadaCal">Открыть сверку угла</button></div>
+    </div>
+    <h3>В планах</h3>
+    <ul><li>Массовая смена угла и режима трекеров (отложено, сначала обсудим).</li><li>Живые статусы трекеров на карте поля.</li></ul>
+    <p>Прямое управление SCADA из этого сайта пока не работает: SCADA в закрытой сети станции.</p>
+  </div>
+</div>
+
+<div class="mapview" id="mapView" role="dialog" aria-modal="true" aria-labelledby="mapTitle" hidden>
+  <div class="map-head">
+    <button type="button" class="ghost" id="mapBack" hidden>← Вся схема</button>
+    <h2 id="mapTitle">Схема поля</h2>
+    <span class="map-sub">схема, не масштаб</span>
+    <button type="button" class="x-btn" id="mapClose" aria-label="Закрыть схему"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <p class="map-msg" id="mapMsg"></p>
+  <div class="map-find"><input id="mapFind" type="search" placeholder="Найти трекер: 13-87 или блок 13" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Найти трекер или блок" disabled><div class="who-list" id="mapFindList" role="listbox" hidden></div></div>
+  <div class="map-scroll" id="mapScroll"><svg id="mapSvg" role="group" aria-label="Схема блоков поля" hidden></svg><svg id="mapBlk" role="group" aria-label="Трекеры блока" hidden></svg></div>
+  <div class="map-legend" id="mapLegend" hidden><span><i class="l1"></i>1-я очередь</span><span><i class="l2"></i>2-я очередь</span><span id="mapUnsure"><i class="l3"></i>положение блока не подтверждено</span><span><i class="l6"></i>дороги</span><span><i class="l7"></i>ящик связи</span><span class="map-pan">Схему можно листать вбок</span></div>
+  <div class="map-legend" id="mapLegend2" hidden><span><i class="l4"></i>выбранный трекер</span><span><i class="l1"></i>соседние</span><span><i class="l5"></i>ящик связи блока</span><span>ряд 1 сверху, как в таблице станции; пустое место — нет трекера</span><span class="map-pan">Сетку можно листать вбок</span></div>
+  <div class="trk-card" id="mapCard" aria-live="polite" hidden></div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="drawer" id="drawer" aria-label="Меню" hidden>
+  <div class="drawer-head">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="workers">Работники</button>
+      <button type="button" role="tab" data-tab="data">Данные</button>
+      <button type="button" role="tab" data-tab="lists">Настройки</button>
+    </div>
+    <button type="button" class="x-btn" id="drawerClose" aria-label="Закрыть меню"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <div class="tab" id="tab-workers" role="tabpanel">
+    <section>
+      <form class="w-form" id="wForm" autocomplete="off">
+        <h3 id="wFormTitle">Добавить работника</h3>
+        <input id="wName" placeholder="Имя и фамилия">
+        <input id="wPhone" placeholder="+998 90 123 45 67" inputmode="tel" autocomplete="off">
+        <input id="wNote" placeholder="Примечание: бригада, подрядчик">
+        <div class="btn-row">
+          <button type="button" class="ghost" id="wCancel" hidden>Отмена</button>
+          <button type="submit" class="primary">Сохранить</button>
+        </div>
+      </form>
+    </section>
+    <section>
+      <input id="wFilter" placeholder="Найти по имени или номеру" style="margin-bottom:6px">
+      <div id="wList"></div>
+    </section>
+  </div>
+
+  <div class="tab" id="tab-data" role="tabpanel" hidden>
+    <section id="ghSection">
+      <h3>GitHub</h3>
+      <div id="ghForm">
+        <p class="note">Журнал сохраняется в файл приватного репозитория GitHub и подтягивает записи других диспетчеров. Токен: GitHub → Settings → Developer settings → Fine-grained tokens, доступ только к этому репозиторию, право Contents: Read and write. Токен хранится в этом браузере только зашифрованным паролем, при открытии страницы пароль спрашивается один раз. В файл журнала и в резервную копию токен не попадает. Пароль не восстанавливается: если забыл, подключи GitHub заново.</p>
+        <div class="field"><label for="ghRepo">Приватный репозиторий</label><input id="ghRepo" placeholder="владелец/репозиторий" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="row2">
+          <div class="field"><label for="ghPath">Файл</label><input id="ghPath" value="scada-log.json" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+          <div class="field"><label for="ghBranch">Ветка</label><input id="ghBranch" placeholder="по умолчанию" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        </div>
+        <div class="field"><label for="ghToken">Токен доступа</label><input id="ghToken" type="password" autocomplete="off" placeholder="github_pat_…" spellcheck="false"></div>
+        <div class="row2">
+          <div class="field"><label for="ghPass">Пароль для токена</label><input id="ghPass" type="password" autocomplete="off" placeholder="не короче 8 символов" spellcheck="false"></div>
+          <div class="field"><label for="ghPass2">Пароль ещё раз</label><input id="ghPass2" type="password" autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="btn-row"><button type="button" class="primary" id="btnGhConnect">Подключить</button></div>
+      </div>
+      <div id="ghOn" hidden>
+        <p class="backup-state" id="ghInfo"></p>
+        <p class="note">Каждое изменение отправляется в GitHub через пару секунд, новые записи других диспетчеров подтягиваются раз в минуту. Без связи журнал работает в браузере и отправит накопленное, когда связь появится.</p>
+        <p class="note">«Заблокировать» убирает токен из памяти, например перед сдачей смены. Записи продолжают сохраняться в браузере и уйдут в GitHub после ввода пароля.</p>
+        <div class="btn-row"><button type="button" class="primary" id="btnGhUnlock" hidden>Разблокировать</button><button type="button" class="primary" id="btnGhSync">Синхронизировать сейчас</button><button type="button" class="ghost" id="btnGhLock">Заблокировать</button><button type="button" class="ghost" id="btnGhOff">Отключить</button></div>
+      </div>
+    </section>
+    <section>
+      <h3>Рабочий файл</h3>
+      <p class="note" id="fileNote"></p>
+      <div class="btn-row">
+        <button type="button" class="primary" id="btnReconnect" hidden>Подключить</button>
+        <button type="button" class="ghost" id="btnNewFile">Создать новый файл</button>
+        <button type="button" class="ghost" id="btnOpenFile">Открыть файл</button>
+      </div>
+    </section>
+    <section>
+      <h3>Excel</h3>
+      <p class="note">Таблица звонков и список работников в файле .xlsx.</p>
+      <div class="inline">
+        <select id="xlRange" aria-label="Период для Excel">
+          <option value="day">Выбранный день</option>
+          <option value="month">Месяц выбранного дня</option>
+          <option value="all">Все записи</option>
+        </select>
+        <button type="button" class="primary" id="btnXlsx">Скачать Excel</button>
+      </div>
+    </section>
+    <section>
+      <h3>Резервная копия</h3>
+      <p class="backup-state" id="backupState"></p>
+      <p class="note">Разовая копия всех данных на флешку, другой компьютер или телефон. В отличие от рабочего файла, она сама не обновляется. Загрузка добавляет записи из копии к текущим и ничего не удаляет.</p>
+      <div class="btn-row">
+        <button type="button" class="primary" id="btnExport">Скачать копию</button>
+        <button type="button" class="ghost" id="btnImport">Загрузить копию</button>
+        <input type="file" id="importInput" accept=".json,application/json" hidden>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab" id="tab-lists" role="tabpanel" hidden>
+    <section>
+      <h3>Списки для формы</h3>
+      <div class="field"><label for="sTypes">Устройства, по одному на строку</label><textarea id="sTypes" rows="7"></textarea></div>
+      <div class="field"><label for="sActions">Что просят, по одному на строку</label><textarea id="sActions" rows="9"></textarea></div>
+      <div class="field"><label for="sAlert">Подсвечивать красным, если возврата ждут дольше, ч</label><input id="sAlert" inputmode="decimal" placeholder="2"><p class="note" style="margin-top:6px">0 отключает подсветку.</p></div>
+      <p class="note">«Ручной», «угол» и «наклон» сразу ставят отметку «вернуть в исходное», а «угол» и «наклон» ещё открывают поле угла. Новые пункты можно добавлять и прямо в форме кнопкой «+ Своё».</p>
+      <div class="btn-row">
+        <button type="button" class="ghost" id="btnResetLists">Вернуть стандартные</button>
+        <button type="button" class="primary" id="btnSaveLists">Сохранить списки</button>
+      </div>
+    </section>
+    <section>
+      <h3>Станция и трекеры</h3>
+      <p class="note">Нужно, чтобы форма подсказывала угол по солнцу. Координаты станции можно взять в Google Maps: нажми правой кнопкой на станцию, первая строка в меню и есть широта и долгота. Её можно вставить целиком в поле «Широта».</p>
+      <div class="row2">
+        <div class="field"><label for="sLat">Широта</label><input id="sLat" inputmode="decimal" placeholder="41.3111"></div>
+        <div class="field"><label for="sLon">Долгота</label><input id="sLon" inputmode="decimal" placeholder="69.2797"></div>
+      </div>
+      <div class="btn-row" style="margin-bottom:14px"><button type="button" class="ghost" id="btnGeo">Определить по GPS этого устройства</button></div>
+      <div class="row2">
+        <div class="field"><label for="sMax">Предельный угол трекера, °</label><input id="sMax" inputmode="decimal" placeholder="60"></div>
+        <div class="field"><label for="sGcr">GCR (необязательно)</label><input id="sGcr" inputmode="decimal" placeholder="0,35"></div>
+      </div>
+      <div class="field"><label for="sSkew">Поворот рядов от линии север–юг, °</label><input id="sSkew" inputmode="decimal" placeholder="0"></div>
+      <div class="field"><label for="sSign">Знак угла в SCADA</label><select id="sSign"><option value="w">+ на запад, − на восток</option><option value="e">+ на восток, − на запад</option></select></div>
+      <p class="note">Поворот рядов: на сколько градусов ось трекера отклонена от линии север–юг (по часовой стрелке, если смотреть сверху). Если ряды идут строго север–юг, оставь 0. GCR: ширина стола, делённая на расстояние между рядами. Если указать, расчёт учтёт backtracking (утром и вечером стол выравнивается, чтобы ряды не затеняли друг друга). Если на станции backtracking выключен, оставь пустым. Предел угла и знак возьми из паспорта трекера или с экрана SCADA.</p>
+      <div class="btn-row"><button type="button" class="primary" id="btnSaveSite">Сохранить станцию</button></div>
+    </section>
+    <section>
+      <h3>Сверка угла со SCADA</h3>
+      <p class="note">Чтобы проверить расчёт, добавьте несколько точек: время и угол, который в этот момент показывала SCADA. Лучше 3–4 точки в разное время дня, в том числе утром или вечером. Станция должна быть сохранена выше. Точки хранятся только в этом браузере.</p>
+      <div class="row2">
+        <div class="field"><label for="cTime">Время</label><input id="cTime" type="datetime-local"></div>
+        <div class="field"><label for="cAngle">Угол в SCADA, °</label><input id="cAngle" inputmode="decimal" placeholder="-24,5"></div>
+      </div>
+      <div class="btn-row"><button type="button" class="primary" id="btnCalAdd">Добавить точку</button><button type="button" class="ghost" id="btnCalFit">Подобрать поворот рядов</button><button type="button" class="ghost" id="btnCalClear">Очистить</button></div>
+      <div class="cal" id="calOut" aria-live="polite"></div>
+    </section>
+  </div>
+</aside>
+
+<div class="loader" id="loader" role="alertdialog" aria-modal="true" aria-live="assertive" aria-labelledby="loaderText" hidden>
+  <div class="loader-box" tabindex="-1" id="loaderBox">
+    <div class="spin" id="loaderSpin"></div>
+    <p id="loaderText"></p>
+    <p class="loader-err" id="loaderErr" hidden></p>
+    <div class="btn-row" id="loaderBtns" hidden>
+      <button type="button" class="primary" id="loaderRetry">Повторить</button>
+      <button type="button" class="ghost" id="loaderClose">Закрыть</button>
+    </div>
+  </div>
+</div>
+<div class="loader" id="passDlg" role="dialog" aria-modal="true" aria-labelledby="pdTitle" hidden>
+  <form class="loader-box pass-box shown" id="pdForm" autocomplete="off">
+    <p id="pdTitle"></p>
+    <p class="note" id="pdText"></p>
+    <input id="pd1" type="password" autocomplete="off" spellcheck="false" aria-label="Пароль">
+    <input id="pd2" type="password" autocomplete="off" spellcheck="false" placeholder="Пароль ещё раз" aria-label="Пароль ещё раз" hidden>
+    <p class="loader-err" id="pdErr" hidden></p>
+    <div class="btn-row"><button type="submit" class="primary" id="pdOk"></button><button type="button" class="ghost" id="pdCancel"></button></div>
+  </form>
+</div>
+<datalist id="dlBy"></datalist><datalist id="dlDev"></datalist><datalist id="dlLoc"></datalist><datalist id="dlOrig"></datalist>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastAct" hidden></button></div>
+
+<script>
+/*@JS@*/
+</script>
+</body>
+</html>

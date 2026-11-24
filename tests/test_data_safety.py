@@ -84,6 +84,14 @@ with sync_playwright() as p:
     check('подложенный код не выполнился', pg.evaluate('window.__pwn') is None)
     check('подложенных элементов на странице нет', pg.evaluate("!document.querySelector('#pwn2,#pwn3,#pwn4') && !document.querySelector('#mapView img, #mapCard img')"))
 
+    # второй слой: даже если где-то пропущено экранирование, CSP не даст выполнить встроенный обработчик
+    errs_before = len(errs)
+    pg.evaluate("""document.getElementById('mapCard').insertAdjacentHTML('beforeend', '<img id="cspProbe" src="data:," onerror="window.__pwn2=1">')""")
+    pg.wait_for_timeout(300)
+    check('CSP: встроенный обработчик из разметки не выполняется', pg.evaluate('window.__pwn2') is None)
+    errs[:] = [e for e in errs[:errs_before]] + [e for e in errs[errs_before:] if 'Content Security Policy' not in e]  # отказ CSP ожидаем
+    pg.evaluate("document.getElementById('cspProbe').remove()")
+
     check('нет ошибок в консоли', not errs, errs[:3])
     b.close()
 
