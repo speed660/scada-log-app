@@ -59,7 +59,9 @@ with sync_playwright() as p:
         over = j.evaluate("() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
         check(f'журнал: шапка не вылезает за экран ({tag})', over <= 0, over)
         h = j.evaluate("() => document.querySelector('.top').getBoundingClientRect().height")
-        check(f'журнал: шапка не раздулась ({tag})', h < 80, round(h))
+        nav = j.evaluate("() => document.querySelector('#sections').getBoundingClientRect().height")
+        check(f'журнал: верхняя строка шапки не раздулась ({tag})', h - nav < 80, round(h - nav))
+        check(f'журнал: шапка вместе с полосой разделов не выше 130 px ({tag})', h < 130, round(h))
         c.close()
 
     # ---------- шифровальщик ----------

@@ -74,6 +74,24 @@ with sync_playwright() as p:
     pg.press('body', 'Escape')
     check('A: Escape закрывает', not pg.is_visible('#mapView'))
 
+    # A2. полоса разделов и раздел SCADA
+    names = pg.evaluate("[...document.querySelectorAll('#sections .sec')].map(e => e.textContent.trim())")
+    check('A2: разделы: Журнал, Карта, SCADA, Учебник', names == ['Журнал', 'Карта', 'SCADA', 'Учебник'], names)
+    check('A2: «Журнал» отмечен как текущий', pg.evaluate("document.querySelector('#sections .sec.on').textContent.trim()") == 'Журнал')
+    pg.click('#btnScada')
+    check('A2: раздел SCADA открылся и говорит, что уже есть и что в планах', pg.is_visible('#scadaView') and 'Уже есть' in pg.inner_text('#scadaView') and 'В планах' in pg.inner_text('#scadaView'))
+    pg.press('body', 'Escape')
+    check('A2: Escape закрывает SCADA', not pg.is_visible('#scadaView'))
+    pg.click('#btnScada'); pg.click('#btnScadaCal')
+    check('A2: «Открыть сверку угла» ведёт в настройки', not pg.is_visible('#scadaView') and pg.is_visible('#drawer') and pg.is_visible('#btnCalAdd'))
+    pg.evaluate('closeDrawer()')
+    pg.click('#btnMap')
+    check('A2: на карте отмечен раздел «Карта», полоса разделов видна', pg.evaluate("document.querySelector('#sections .sec.on').textContent.trim()") == 'Карта' and pg.is_visible('#sections'))
+    pg.click('#btnScada')
+    check('A2: из карты можно перейти в SCADA одним нажатием', pg.is_visible('#scadaView') and not pg.is_visible('#mapView') and pg.evaluate("document.querySelector('#sections .sec.on').textContent.trim()") == 'SCADA')
+    pg.click('#btnJournal')
+    check('A2: «Журнал» закрывает разделы', not pg.is_visible('#scadaView') and not pg.is_visible('#mapView') and pg.evaluate("document.querySelector('#sections .sec.on').textContent.trim()") == 'Журнал')
+
     # B. подключаем GitHub
     pg.click('#btnMenu'); pg.click('[data-tab=data]')
     pg.fill('#ghRepo', 'o/r'); pg.fill('#ghToken', GOOD); pg.fill('#ghPass', 'shift-pass-1'); pg.fill('#ghPass2', 'shift-pass-1')
