@@ -112,18 +112,23 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .map-scroll{overflow:auto;padding:12px 16px;-webkit-overflow-scrolling:touch}
 #mapSvg{display:block;width:max(100%,940px);height:auto;font-family:inherit}
 #mapSvg .mb{cursor:pointer}
-#mapSvg .mb rect{fill:var(--teal-soft);stroke:var(--teal);stroke-width:.7}
-#mapSvg .mb.ph2 rect{fill:var(--sun-soft);stroke:var(--sun)}
-#mapSvg .mb.unk rect{fill:var(--soft);stroke:var(--muted)}
-#mapSvg .mb.uncertain rect{stroke-dasharray:2.5 1.5}
-#mapSvg .mb text{fill:var(--ink);text-anchor:middle;pointer-events:none}
-#mapSvg .mb .num{font-size:8.5px;font-weight:700}
-#mapSvg .mb .fr{font-size:4.6px;fill:var(--muted)}
-#mapSvg .mb:hover rect{stroke-width:1.5}
+#mapSvg .mb .fl{fill:var(--teal-soft)}
+#mapSvg .mb .ed{fill:none;stroke:var(--teal);stroke-width:.45}
+#mapSvg .mb.ph2 .fl{fill:var(--sun-soft)}
+#mapSvg .mb.ph2 .ed{stroke:var(--sun)}
+#mapSvg .mb.uncertain .ed{stroke-dasharray:1.5 1}
+#mapSvg .mb text{fill:var(--ink);text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:1.6px;stroke-linejoin:round}
+#mapSvg .mb .num{font-size:11px;font-weight:700}
+#mapSvg .mb .fr{font-size:5.6px;fill:var(--muted)}
+#mapSvg .mb:hover .ed{stroke-width:1}
 #mapSvg .mb:focus{outline:none}
-#mapSvg .mb:focus-visible rect{stroke-width:1.8;stroke:var(--ink)}
-#mapSvg .mb.sel rect{fill:var(--teal);stroke:var(--ink);stroke-width:1.8}
-#mapSvg .mb.sel text{fill:var(--teal-ink)}
+#mapSvg .mb:focus-visible .ed{stroke-width:1.2;stroke:var(--ink)}
+#mapSvg .mb.sel .fl{fill:var(--teal)}
+#mapSvg .mb.sel .ed{stroke:var(--ink);stroke-width:1}
+#mapSvg .mb.sel text{fill:var(--teal-ink);stroke:var(--teal)}
+#mapSvg .rd rect{fill:#e6d77a;opacity:.45}
+#mapSvg .bx{fill:var(--sun-ink);pointer-events:none}
+#mapSvg .pin circle{fill:none;stroke:var(--danger);stroke-width:1.3;pointer-events:none}
 #mapSvg .en text{font-size:5px;fill:var(--ink)}
 #mapSvg .en path{fill:var(--danger)}
 .map-legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:0 16px;font-size:13px;color:var(--muted)}
@@ -148,6 +153,8 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 #mapBlk .lbl{fill:var(--muted);font-size:6.4px;text-anchor:middle}
 .map-legend .l4{background:var(--teal);border-color:var(--ink)}
 .map-legend .l5{border-style:dashed;border-color:var(--sun)}
+.map-legend .l6{background:#e6d77a;border-color:#c9b94f}
+.map-legend .l7{width:8px;height:8px;background:var(--sun-ink);border-color:var(--sun-ink)}
 .map-legend .l3{border-style:dashed;border-color:var(--muted)}
 #mapCard{margin:12px 16px calc(16px + env(safe-area-inset-bottom,0px));max-width:560px}
 .opt.muted{color:var(--muted);cursor:default}
@@ -429,7 +436,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
   </div>
   <p class="map-msg" id="mapMsg"></p>
   <div class="map-scroll" id="mapScroll"><svg id="mapSvg" role="group" aria-label="Схема блоков поля" hidden></svg><svg id="mapBlk" role="group" aria-label="Трекеры блока" hidden></svg></div>
-  <div class="map-legend" id="mapLegend" hidden><span><i class="l1"></i>1-я очередь</span><span><i class="l2"></i>2-я очередь</span><span><i class="l3"></i>положение блока не подтверждено</span><span class="map-pan">Схему можно листать вбок</span></div>
+  <div class="map-legend" id="mapLegend" hidden><span><i class="l1"></i>1-я очередь</span><span><i class="l2"></i>2-я очередь</span><span id="mapUnsure"><i class="l3"></i>положение блока не подтверждено</span><span><i class="l6"></i>дороги</span><span><i class="l7"></i>ящик связи</span><span class="map-pan">Схему можно листать вбок</span></div>
   <div class="map-legend" id="mapLegend2" hidden><span><i class="l4"></i>выбранный трекер</span><span><i class="l1"></i>соседние</span><span><i class="l5"></i>ящик связи блока</span><span>ряд 1 сверху, как в таблице станции; пустое место — нет трекера</span><span class="map-pan">Сетку можно листать вбок</span></div>
   <div class="trk-card" id="mapCard" aria-live="polite" hidden></div>
 </div>
@@ -2025,14 +2032,67 @@ document.addEventListener('click', e => {
 });
 
 /* ---------- Схема поля (уровень 1) ---------- */
-const MAP_FILE = 'map/layout.json';
+const MAP_FILE = 'map/field.json';
 function mapBuild(d) {
-  if (!d || d.app !== 'scada-map-layout' || !Array.isArray(d.blocks)) throw new GhError('Файл схемы в другом формате', { kind: 'corrupt' });
-  const num = v => typeof v === 'number' && isFinite(v);
-  const blocks = d.blocks.filter(b => b && Number.isInteger(b.n) && [b.x, b.y, b.w, b.h].every(num) && b.w > 0 && b.h > 0);
-  if (!blocks.length) throw new GhError('В файле схемы нет блоков', { kind: 'corrupt' });
-  const ents = (Array.isArray(d.entrances) ? d.entrances : []).filter(e => e && typeof e.name === 'string' && num(e.x) && num(e.y));
-  return { blocks, ents, ys: num(d.yscale) && d.yscale > 0 ? d.yscale : 3 };
+  if (!d || d.app !== 'scada-map-field' || !Array.isArray(d.blocks)) throw new GhError('Файл схемы в другом формате', { kind: 'corrupt' });
+  const int = v => Number.isInteger(v), pair = a => Array.isArray(a) && a.length >= 2 && int(a[0]) && int(a[1]);
+  const blocks = new Map();
+  for (const b of d.blocks) {
+    if (!b || !int(b.n) || !int(b.dr) || !int(b.dc)) continue;
+    blocks.set(b.n, { n: b.n, dr: b.dr, dc: b.dc, cells: Array.isArray(b.cells) ? b.cells.filter(c => Array.isArray(c) && c.length >= 3 && c.every(int)) : null, extra: Array.isArray(b.extra) ? b.extra.filter(pair) : [], box: pair(b.box) ? b.box : null });
+  }
+  if (!blocks.size) throw new GhError('В файле схемы нет блоков', { kind: 'corrupt' });
+  const roads = (Array.isArray(d.roads) ? d.roads : []).filter(a => Array.isArray(a) && a.length >= 3 && a.every(int));
+  const ents = (Array.isArray(d.entrances) ? d.entrances : []).filter(e => e && typeof e.name === 'string' && int(e.r) && int(e.c));
+  const unsure = new Set((Array.isArray(d.unsure) ? d.unsure : []).filter(int));
+  return { blocks, roads, ents, unsure, ys: typeof d.yscale === 'number' && d.yscale > 0 ? d.yscale : 5, geo: null };
+}
+// Клетки каждого блока на общей сетке: положение в сетке блока + смещение. Считается при первом показе схемы после загрузки данных.
+function mapGeo() {
+  const L = mapLayout; if (L.geo) return L.geo;
+  const geo = new Map();
+  let r0 = 1e9, r1 = -1e9, c0 = 1e9, c1 = -1e9;
+  for (const [n, fb] of L.blocks) {
+    const info = trkData.blocks.get(n); if (!info) continue;
+    const cells = [], at = new Map();
+    if (fb.cells) for (const [num, r, c] of fb.cells) { cells.push([r, c]); at.set(num, [r, c]); }
+    else for (const [num, rc] of info.nums) { const p = [rc[0] + fb.dr, rc[1] + fb.dc]; cells.push(p); at.set(num, p); }
+    for (const p of fb.extra) cells.push(p);
+    if (!cells.length) continue;
+    const set = new Set(cells.map(p => p[0] + ',' + p[1]));
+    // подпись ставим в самую населённую группу рядов (у блока может быть продолжение в другой полосе)
+    const rows = [...new Set(cells.map(p => p[0]))].sort((a, b) => a - b), groups = []; let cur = [rows[0]];
+    for (const r of rows.slice(1)) { if (r - cur[cur.length - 1] > 1) { groups.push(cur); cur = []; } cur.push(r); }
+    groups.push(cur);
+    let best = null, bn = -1;
+    for (const g of groups) { const inG = cells.filter(p => p[0] >= g[0] && p[0] <= g[g.length - 1]); if (inG.length > bn) { bn = inG.length; best = inG; } }
+    const lab = [best.reduce((a, p) => a + p[1], 0) / best.length + 0.5, best.reduce((a, p) => a + p[0], 0) / best.length + 0.5];
+    // заливка: клетки одной строки подряд в один прямоугольник; контур: рёбра, где рядом нет клетки этого же блока
+    let fill = '', edge = '';
+    const byRow = new Map(); for (const [r, c] of cells) { if (!byRow.has(r)) byRow.set(r, []); byRow.get(r).push(c); }
+    const ys = L.ys, H = [], V = [];
+    for (const [r, cs] of byRow) {
+      cs.sort((a, b) => a - b); let s0 = cs[0], pv = cs[0];
+      for (const c of cs.slice(1).concat([1e9])) { if (c !== pv + 1) { fill += `M${s0} ${r * ys}h${pv - s0 + 1}v${ys}h${-(pv - s0 + 1)}z`; s0 = c; } pv = c; }
+    }
+    for (const [r, c] of cells) {
+      if (!set.has((r - 1) + ',' + c)) H.push([r, c]);
+      if (!set.has((r + 1) + ',' + c)) H.push([r + 1, c]);
+      if (!set.has(r + ',' + (c - 1))) V.push([c, r]);
+      if (!set.has(r + ',' + (c + 1))) V.push([c + 1, r]);
+    }
+    const runs = (arr, horiz) => { // [линия, позиция] -> слитные отрезки
+      const m = new Map(); for (const [a, b] of arr) { if (!m.has(a)) m.set(a, []); m.get(a).push(b); }
+      let d = '';
+      for (const [a, bs] of m) { bs.sort((x, y) => x - y); let s0 = bs[0], pv = bs[0];
+        for (const b of bs.slice(1).concat([1e9])) { if (b !== pv + 1) { d += horiz ? `M${s0} ${a * ys}h${pv - s0 + 1}` : `M${a} ${s0 * ys}v${(pv - s0 + 1) * ys}`; s0 = b; } pv = b; } }
+      return d;
+    };
+    edge = runs(H, true) + runs(V, false);
+    for (const [r, c] of cells) { if (r < r0) r0 = r; if (r > r1) r1 = r; if (c < c0) c0 = c; if (c > c1) c1 = c; }
+    geo.set(n, { fill, edge, lab, at, box: fb.box });
+  }
+  return (L.geo = { blocks: geo, r0, r1, c0, c1 });
 }
 function mapLoad() {
   if (mapLayout && trkData) return Promise.resolve(true);
@@ -2080,26 +2140,29 @@ function renderMap() {
   if (zoomOK) { msg.hidden = true; $('mapTitle').textContent = 'Блок ' + mapSel.b; } else $('mapTitle').textContent = 'Схема поля';
   $('mapBack').hidden = !zoomOK;
   svg.toggleAttribute('hidden', !ready); $('mapLegend').hidden = !ready; // у SVG нет свойства hidden
+  if (ready) $('mapUnsure').hidden = !mapLayout.unsure.size;
   blkSvg.toggleAttribute('hidden', !zoomOK); $('mapLegend2').hidden = !zoomOK;
   if (zoomOK) { svg.innerHTML = ''; renderMapBlock(blkSvg, card); return; }
   blkSvg.innerHTML = '';
   if (!ready) { svg.innerHTML = ''; card.innerHTML = ''; card.hidden = true; return; }
-  const L = mapLayout, ys = L.ys;
-  const x0 = Math.min(...L.blocks.map(b => b.x)) - 4, y0 = Math.min(...L.blocks.map(b => b.y * ys)) - 4;
-  const x1 = Math.max(...L.blocks.map(b => b.x + b.w), ...L.ents.map(e => e.x + 62)) + 2, y1 = Math.max(...L.blocks.map(b => (b.y + b.h) * ys)) + 6;
+  const L = mapLayout, ys = L.ys, G = mapGeo();
+  const x0 = G.c0 - 3, y0 = (G.r0 - 1) * ys, x1 = Math.max(G.c1 + 2, ...L.ents.map(e => e.c + 62)), y1 = (G.r1 + 2) * ys;
   svg.setAttribute('viewBox', [x0, y0, x1 - x0, y1 - y0].join(' '));
-  let h = '';
-  for (const b of L.blocks) {
-    const info = trkData.blocks.get(b.n), cls = info ? (info.phase === 1 ? 'ph1' : 'ph2') : 'unk';
-    const sel = mapSel && mapSel.b === b.n, cx = b.x + b.w / 2, cy = (b.y + b.h / 2) * ys;
-    h += `<g class="mb ${cls}${b.uncertain ? ' uncertain' : ''}${sel ? ' sel' : ''}" data-n="${b.n}" tabindex="0" role="button" aria-pressed="${sel ? 'true' : 'false'}" aria-label="Блок ${b.n}${info ? ', канал ' + esc(info.freq) : ''}">` +
-      `<rect x="${b.x}" y="${b.y * ys}" width="${b.w}" height="${b.h * ys}" rx="1.6"/>` +
-      `<text class="num" x="${cx}" y="${cy + (info ? -0.5 : 3)}">${b.n}</text>` + (info ? `<text class="fr" x="${cx}" y="${cy + 6}">${esc(info.freq)}</text>` : '') + '</g>';
+  let h = '<g class="rd">' + L.roads.map(([r, a, b]) => `<rect x="${a}" y="${r * ys}" width="${b - a + 1}" height="${ys}"/>`).join('') + '</g>';
+  for (const [n, g] of G.blocks) {
+    const info = trkData.blocks.get(n), cls = info.phase === 1 ? 'ph1' : 'ph2';
+    const sel = mapSel && mapSel.b === n;
+    h += `<g class="mb ${cls}${L.unsure.has(n) ? ' uncertain' : ''}${sel ? ' sel' : ''}" data-n="${n}" tabindex="0" role="button" aria-pressed="${sel ? 'true' : 'false'}" aria-label="Блок ${n}, канал ${esc(info.freq)}">` +
+      `<path class="fl" d="${g.fill}"/><path class="ed" d="${g.edge}"/>` +
+      `<text class="num" x="${g.lab[0]}" y="${g.lab[1] * ys - 1}">${n}</text><text class="fr" x="${g.lab[0]}" y="${g.lab[1] * ys + 6}">${esc(info.freq)}</text></g>`;
   }
-  for (const e of L.ents) h += `<g class="en"><path d="M${e.x - 7} ${e.y * ys - 3} l6 3 l-6 3 z"/><text x="${e.x}" y="${e.y * ys + 1.5}">${esc(e.name)}</text></g>`;
+  for (const [n, g] of G.blocks) if (g.box) h += `<rect class="bx" x="${g.box[1] + 0.5 - 1.1}" y="${(g.box[0] + 0.5) * ys - 1.1}" width="2.2" height="2.2"/>`;
+  for (const e of L.ents) h += `<g class="en"><path d="M${e.c - 1} ${(e.r + 0.5) * ys - 3} l-7 3 l7 3 z"/><text x="${e.c + 1.5}" y="${(e.r + 0.5) * ys + 1.6}">${esc(e.name)}</text></g>`;
+  const tg = mapSel && mapSel.n && G.blocks.has(mapSel.b) && G.blocks.get(mapSel.b).at.get(mapSel.n);
+  if (tg) h += `<g class="pin"><circle cx="${tg[1] + 0.5}" cy="${(tg[0] + 0.5) * ys}" r="4.2"/></g>`;
   svg.innerHTML = h;
   if (mapSel && trkData.blocks.has(mapSel.b)) {
-    const bl = L.blocks.find(b => b.n === mapSel.b);
+    const bl = { uncertain: L.unsure.has(mapSel.b) };
     card.innerHTML = trkCardHTML(mapSel.n ? { k: 'trk', b: mapSel.b, n: mapSel.n } : { k: 'block', b: mapSel.b }, true) +
       (bl && bl.uncertain ? '<p class="trk-warn">Положение этого блока на схеме не подтверждено.</p>' : '') +
       `<div class="trk-acts"><button type="button" class="ghost" data-act="zoom">Открыть блок</button></div>`;
@@ -2135,7 +2198,7 @@ function mapPickTrk(g) {
   const again = $('mapBlk').querySelector('.tc.sel'); if (again) again.focus({ preventScroll: true });
   if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
 }
-function mapBack() { if (!mapZoom) return; mapZoom = false; if (mapSel) mapSel.n = 0; renderMap(); mapSeeSel(); }
+function mapBack() { if (!mapZoom) return; mapZoom = false; renderMap(); mapSeeSel(); }
 function mapPick(g) {
   if (!g) return;
   mapSel = { b: +g.dataset.n, n: 0 };

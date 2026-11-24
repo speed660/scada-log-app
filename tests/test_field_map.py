@@ -1,11 +1,11 @@
 """Схема поля (уровень 1): загрузка из приватного репозитория (подставной GitHub), блоки, карточка, связь с поиском трекера, блокировка.
-Данные выдуманные (tests/fixtures/map-sample.json и map-layout-sample.json), настоящих данных станции здесь нет."""
+Данные выдуманные (tests/fixtures/map-sample.json и map-field-sample.json), настоящих данных станции здесь нет."""
 from playwright.sync_api import sync_playwright
 from common import *
 import json, base64, time, sys
 
 GOOD = 'github_pat_goodtoken1234567890abcd'
-LAYOUT = open(os.path.join(HERE, 'fixtures', 'map-layout-sample.json'), encoding='utf-8').read()
+LAYOUT = open(os.path.join(HERE, 'fixtures', 'map-field-sample.json'), encoding='utf-8').read()
 SAMPLE = open(os.path.join(HERE, 'fixtures', 'map-sample.json'), encoding='utf-8').read()
 FIXES = json.dumps({"app": "scada-map-corrections", "version": 1, "items": [
     {"id": "c1", "block": 2, "found": "BLK2-TRK1010", "proposed": "BLK2-TRK110", "status": "proposed"},
@@ -45,7 +45,7 @@ def handler(route, request):
         mock['map_gets'] += 1
         if not mock['map']: js(404, {'message': 'Not Found'}); return
         js(200, {'type': 'file', 'sha': 'm1', 'size': len(SAMPLE), 'content': enc(SAMPLE), 'encoding': 'base64'}); return
-    if url == base + '/contents/map/layout.json' and request.method == 'GET':
+    if url == base + '/contents/map/field.json' and request.method == 'GET':
         if not mock['layout']: js(404, {'message': 'Not Found'}); return
         js(200, {'type': 'file', 'sha': 'l1', 'size': len(LAYOUT), 'content': enc(LAYOUT), 'encoding': 'base64'}); return
     if url == base + '/contents/map/corrections.json' and request.method == 'GET':
@@ -81,10 +81,13 @@ with sync_playwright() as p:
     wait_js("document.getElementById('loader').hidden")
     pg.evaluate('closeDrawer()')
     pg.click('#btnMap'); pg.wait_for_selector('#mapSvg:not([hidden])', timeout=8000)
-    check('B: нарисовано 3 блока', pg.locator('#mapSvg .mb').count() == 3, pg.locator('#mapSvg .mb').count())
+    check('B: нарисовано 2 блока', pg.locator('#mapSvg .mb').count() == 2, pg.locator('#mapSvg .mb').count())
     check('B: очередь и канал на блоке', '4242' in pg.evaluate("document.getElementById('mapSvg').textContent"))
-    check('B: блок 1 — 2-я очередь, блок 2 — 1-я', pg.evaluate("[...document.querySelectorAll('#mapSvg .mb')].map(g => g.classList.contains('ph2') ? 2 : g.classList.contains('ph1') ? 1 : 0)") == [2, 1, 0])
-    check('B: блок 3 не подтверждён', pg.evaluate("document.querySelectorAll('#mapSvg .mb.uncertain').length") == 1)
+    check('B: блок 1 — 2-я очередь, блок 2 — 1-я', pg.evaluate("[...document.querySelectorAll('#mapSvg .mb')].map(g => g.classList.contains('ph2') ? 2 : g.classList.contains('ph1') ? 1 : 0)") == [2, 1])
+    check('B: блок 2 не подтверждён', pg.evaluate("document.querySelectorAll('#mapSvg .mb.uncertain').length") == 1 and pg.is_visible('#mapUnsure'))
+    check('B: дороги и ящики нарисованы', pg.locator('#mapSvg .rd rect').count() == 2 and pg.locator('#mapSvg .bx').count() == 2)
+    check('B: у блока 1 три ряда клеток в заливке', pg.evaluate("document.querySelector('#mapSvg .mb[data-n=\"1\"] .fl').getAttribute('d').split('M').length - 1") == 3)
+    check('B: контур блока 1 есть', len(pg.evaluate("document.querySelector('#mapSvg .mb[data-n=\"1\"] .ed').getAttribute('d')")) > 10)
     check('B: вход на схеме', 'Тестовый вход' in pg.evaluate("document.getElementById('mapSvg').textContent"))
     check('B: подпись «не масштаб»', 'не масштаб' in pg.inner_text('#mapView'))
     check('B: карточки пока нет', not pg.is_visible('#mapCard'))
@@ -95,8 +98,7 @@ with sync_playwright() as p:
     check('C: карточка блока 2', pg.is_visible('#mapCard') and 'Блок 2' in card and '4343' in card and '1-я очередь' in card, card)
     check('C: блок отмечен', pg.evaluate("document.querySelector('#mapSvg .mb.sel').dataset.n") == '2')
     check('C: нет кнопки «Показать на схеме» внутри схемы', not pg.is_visible('#mapCard [data-act=map]'))
-    pg.click('#mapSvg .mb[data-n="3"]')
-    check('C: блок без данных не ломает схему', not pg.is_visible('#mapCard') and pg.evaluate("document.querySelector('#mapSvg .mb.sel').dataset.n") == '3')
+    check('C: у неподтверждённого блока есть пометка', 'не подтверждено' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
     pg.focus('#mapSvg .mb[data-n="1"]'); pg.keyboard.press('Enter')
     check('C: выбор с клавиатуры', 'Блок 1' in pg.inner_text('#mapCard'))
     pg.screenshot(path=OUT + '/field_map.png')
@@ -129,6 +131,7 @@ with sync_playwright() as p:
     # E3. «Вся схема» и Escape
     pg.click('#mapBack')
     check('E3: вернулись к схеме поля, блок 1 отмечен', pg.is_visible('#mapSvg') and not pg.is_visible('#mapBlk') and pg.evaluate("document.querySelector('#mapSvg .mb.sel').dataset.n") == '1' and pg.inner_text('#mapTitle') == 'Схема поля')
+    check('E3: на схеме метка выбранного трекера (10) на месте', pg.locator('#mapSvg .pin circle').count() == 1 and pg.evaluate("document.querySelector('#mapSvg .pin circle').getAttribute('cx')") == '12.5' and pg.evaluate("document.querySelector('#mapSvg .pin circle').getAttribute('cy')") == '42.5')
     pg.click('#mapSvg .mb[data-n="2"]'); pg.click('#mapCard [data-act=zoom]')
     check('E3: «Открыть блок» показывает блок 2 без выбранного трекера', pg.is_visible('#mapBlk') and pg.locator('#mapBlk .tc').count() == 7 and pg.locator('#mapBlk .tc.sel').count() == 0 and 'Блок 2' in pg.inner_text('#mapCard'))
     check('E3: ящик связи нарисован в свободной ячейке', pg.locator('#mapBlk .tb').count() == 1)
@@ -140,7 +143,7 @@ with sync_playwright() as p:
 
     # F. данные не попадают в хранилище и журнал
     ls = pg.evaluate('JSON.stringify(Object.assign({}, localStorage))') + pg.evaluate('JSON.stringify(Object.assign({}, sessionStorage))')
-    check('F: в хранилище браузера схемы нет', 'scada-map-layout' not in ls and 'Тестовый вход' not in ls)
+    check('F: в хранилище браузера схемы нет', 'scada-map-field' not in ls and 'Тестовый вход' not in ls)
     check('F: в журнале на GitHub схемы нет', mock['log'] is None or 'scada-map-layout' not in mock['log'])
 
     # G. блокировка закрывает схему и стирает данные
@@ -155,16 +158,16 @@ with sync_playwright() as p:
     pg.wait_for_selector('#mapView:not([hidden])', timeout=3000) if False else None
     pg.click('#btnMap') if not pg.is_visible('#mapView') else None
     pg.wait_for_selector('#mapSvg:not([hidden])', timeout=8000)
-    check('G: после разблокировки схема есть', pg.locator('#mapSvg .mb').count() == 3)
+    check('G: после разблокировки схема есть', pg.locator('#mapSvg .mb').count() == 2)
 
     # H. файла схемы нет: понятная ошибка, «Повторить» работает
     pg.click('#mapClose'); pg.evaluate('trkClear()'); mock['layout'] = False
     pg.click('#btnMap'); pg.wait_for_timeout(700)
-    check('H: ошибка про файл', 'нет файла map/layout.json' in pg.inner_text('#mapMsg'), pg.inner_text('#mapMsg'))
+    check('H: ошибка про файл', 'нет файла map/field.json' in pg.inner_text('#mapMsg'), pg.inner_text('#mapMsg'))
     check('H: поиск трекера при этом работает', pg.evaluate('!!trkData'))
     mock['layout'] = True
     pg.click('#mapMsg [data-act=retry]'); pg.wait_for_selector('#mapSvg:not([hidden])', timeout=8000)
-    check('H: после повтора схема есть', pg.locator('#mapSvg .mb').count() == 3)
+    check('H: после повтора схема есть', pg.locator('#mapSvg .mb').count() == 2)
 
     # I. телефон
     pg.click('#mapClose')
