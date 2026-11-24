@@ -114,6 +114,9 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 #mapSvg .mb{cursor:pointer}
 #mapSvg .mb .fl{fill:var(--teal-soft)}
 #mapSvg .mb .ed{fill:none;stroke:var(--teal);stroke-width:.45}
+#mapSvg .mb .ei{fill:none;stroke:var(--teal);stroke-width:.3;opacity:.3}
+#mapSvg .mb.ph2 .ei{stroke:var(--sun)}
+#mapSvg .mb.sel .ei{stroke:var(--teal-ink);opacity:.35}
 #mapSvg .mb.ph2 .fl{fill:var(--sun-soft)}
 #mapSvg .mb.ph2 .ed{stroke:var(--sun)}
 #mapSvg .mb.uncertain .ed{stroke-dasharray:1.5 1}
@@ -2070,16 +2073,23 @@ function mapGeo() {
     // заливка: клетки одной строки подряд в один прямоугольник; контур: рёбра, где рядом нет клетки этого же блока
     let fill = '', edge = '';
     const byRow = new Map(); for (const [r, c] of cells) { if (!byRow.has(r)) byRow.set(r, []); byRow.get(r).push(c); }
-    const ys = L.ys, H = [], V = [];
+    const ys = L.ys;
     for (const [r, cs] of byRow) {
       cs.sort((a, b) => a - b); let s0 = cs[0], pv = cs[0];
       for (const c of cs.slice(1).concat([1e9])) { if (c !== pv + 1) { fill += `M${s0} ${r * ys}h${pv - s0 + 1}v${ys}h${-(pv - s0 + 1)}z`; s0 = c; } pv = c; }
     }
+    // край считается внутренним проходом, если пустое место за ним лежит внутри размаха блока по этой строке или колонке
+    const rowMin = new Map(), rowMax = new Map(), colMin = new Map(), colMax = new Map();
     for (const [r, c] of cells) {
-      if (!set.has((r - 1) + ',' + c)) H.push([r, c]);
-      if (!set.has((r + 1) + ',' + c)) H.push([r + 1, c]);
-      if (!set.has(r + ',' + (c - 1))) V.push([c, r]);
-      if (!set.has(r + ',' + (c + 1))) V.push([c + 1, r]);
+      rowMin.set(r, Math.min(c, rowMin.has(r) ? rowMin.get(r) : c)); rowMax.set(r, Math.max(c, rowMax.has(r) ? rowMax.get(r) : c));
+      colMin.set(c, Math.min(r, colMin.has(c) ? colMin.get(c) : r)); colMax.set(c, Math.max(r, colMax.has(c) ? colMax.get(c) : r));
+    }
+    const H = [], V = [], Hi = [], Vi = [];
+    for (const [r, c] of cells) {
+      if (!set.has((r - 1) + ',' + c)) (r - 1 > colMin.get(c) ? Hi : H).push([r, c]);
+      if (!set.has((r + 1) + ',' + c)) (r + 1 < colMax.get(c) ? Hi : H).push([r + 1, c]);
+      if (!set.has(r + ',' + (c - 1))) (c - 1 > rowMin.get(r) ? Vi : V).push([c, r]);
+      if (!set.has(r + ',' + (c + 1))) (c + 1 < rowMax.get(r) ? Vi : V).push([c + 1, r]);
     }
     const runs = (arr, horiz) => { // [линия, позиция] -> слитные отрезки
       const m = new Map(); for (const [a, b] of arr) { if (!m.has(a)) m.set(a, []); m.get(a).push(b); }
@@ -2088,9 +2098,9 @@ function mapGeo() {
         for (const b of bs.slice(1).concat([1e9])) { if (b !== pv + 1) { d += horiz ? `M${s0} ${a * ys}h${pv - s0 + 1}` : `M${a} ${s0 * ys}v${(pv - s0 + 1) * ys}`; s0 = b; } pv = b; } }
       return d;
     };
-    edge = runs(H, true) + runs(V, false);
+    edge = runs(H, true) + runs(V, false); const inner = runs(Hi, true) + runs(Vi, false);
     for (const [r, c] of cells) { if (r < r0) r0 = r; if (r > r1) r1 = r; if (c < c0) c0 = c; if (c > c1) c1 = c; }
-    geo.set(n, { fill, edge, lab, at, box: fb.box });
+    geo.set(n, { fill, edge, inner, lab, at, box: fb.box });
   }
   return (L.geo = { blocks: geo, r0, r1, c0, c1 });
 }
@@ -2153,7 +2163,7 @@ function renderMap() {
     const info = trkData.blocks.get(n), cls = info.phase === 1 ? 'ph1' : 'ph2';
     const sel = mapSel && mapSel.b === n;
     h += `<g class="mb ${cls}${L.unsure.has(n) ? ' uncertain' : ''}${sel ? ' sel' : ''}" data-n="${n}" tabindex="0" role="button" aria-pressed="${sel ? 'true' : 'false'}" aria-label="Блок ${n}, канал ${esc(info.freq)}">` +
-      `<path class="fl" d="${g.fill}"/><path class="ed" d="${g.edge}"/>` +
+      `<path class="fl" d="${g.fill}"/><path class="ei" d="${g.inner}"/><path class="ed" d="${g.edge}"/>` +
       `<text class="num" x="${g.lab[0]}" y="${g.lab[1] * ys - 1}">${n}</text><text class="fr" x="${g.lab[0]}" y="${g.lab[1] * ys + 6}">${esc(info.freq)}</text></g>`;
   }
   for (const [n, g] of G.blocks) if (g.box) h += `<rect class="bx" x="${g.box[1] + 0.5 - 1.1}" y="${(g.box[0] + 0.5) * ys - 1.1}" width="2.2" height="2.2"/>`;

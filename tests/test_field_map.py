@@ -87,6 +87,7 @@ with sync_playwright() as p:
     check('B: блок 2 не подтверждён', pg.evaluate("document.querySelectorAll('#mapSvg .mb.uncertain').length") == 1 and pg.is_visible('#mapUnsure'))
     check('B: дороги и ящики нарисованы', pg.locator('#mapSvg .rd rect').count() == 2 and pg.locator('#mapSvg .bx').count() == 2)
     check('B: у блока 1 три ряда клеток в заливке', pg.evaluate("document.querySelector('#mapSvg .mb[data-n=\"1\"] .fl').getAttribute('d').split('M').length - 1") == 3)
+    check('B: внутренний проход блока 2 нарисован отдельно от внешнего контура', len(pg.evaluate("document.querySelector('#mapSvg .mb[data-n=\"2\"] .ei').getAttribute('d')")) > 5 and len(pg.evaluate("document.querySelector('#mapSvg .mb[data-n=\"1\"] .ei').getAttribute('d')")) == 0)
     check('B: контур блока 1 есть', len(pg.evaluate("document.querySelector('#mapSvg .mb[data-n=\"1\"] .ed').getAttribute('d')")) > 10)
     check('B: вход на схеме', 'Тестовый вход' in pg.evaluate("document.getElementById('mapSvg').textContent"))
     check('B: подпись «не масштаб»', 'не масштаб' in pg.inner_text('#mapView'))
