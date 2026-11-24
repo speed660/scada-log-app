@@ -2,7 +2,7 @@
   --paper:#eef2f4;--panel:#ffffff;--ink:#17262f;--muted:#5d6f7a;--line:#d5dde2;--soft:#e5ebee;
   --teal:#0e6e78;--teal-ink:#ffffff;--teal-soft:#dbeef0;
   --sun:#c97f06;--sun-soft:#fbefd9;--sun-ink:#6e4500;
-  --ok:#2f8a57;--danger:#b8402f;
+  --ok:#2f8a57;--danger:#b8402f;--dc:var(--dc);--dc-ink:#ffffff;
   --tag-s:55%;--tag-l:91%;--tag-tl:27%;
   --r-s:6px;--r-m:10px;--r-l:16px;
   --shadow:0 10px 30px rgba(18,38,48,.14);
@@ -12,7 +12,7 @@
   --paper:#10181c;--panel:#172127;--ink:#e4ecef;--muted:#8fa1ab;--line:#26343b;--soft:#1e2a30;
   --teal:#36b0ba;--teal-ink:#05282c;--teal-soft:#15343a;
   --sun:#f2b13a;--sun-soft:#33270f;--sun-ink:#f8d48a;
-  --ok:#5cc58a;--danger:#f07a66;
+  --ok:#5cc58a;--danger:#f07a66;--dc:#c39bea;--dc-ink:#1d0f2b;
   --tag-s:38%;--tag-l:22%;--tag-tl:80%;
   --shadow:0 10px 30px rgba(0,0,0,.45);
   color-scheme:dark;
@@ -115,8 +115,14 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .map-head h2{font-size:18px}
 .map-sub{color:var(--muted);font-size:13px;flex:1}
 .map-msg{margin:12px 16px 0;color:var(--muted);font-size:14px}
-.map-scroll{overflow:auto;padding:12px 16px;-webkit-overflow-scrolling:touch}
-#mapSvg{display:block;width:max(100%,940px);height:auto;font-family:inherit}
+.map-scroll{position:relative;flex:0 0 auto;height:max(300px,calc(100dvh - var(--toph,0px) - 210px));margin:10px 16px 0;border:1px solid var(--line);border-radius:var(--r-m);background:var(--panel);overflow:hidden}
+.map-scroll.dragging,.map-scroll.dragging *{cursor:grabbing!important}
+#mapSvg,#mapBlk{display:block;width:100%;height:100%;font-family:inherit;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.map-zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.map-zoom button{min-width:40px;height:40px;border-radius:var(--r-m);border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:22px;font-weight:700;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer}
+.map-zoom button.fit{font-size:13px;font-weight:600;padding:0 10px}
+.map-zoom button:disabled{opacity:.45;cursor:default}
+@media (max-width:860px){.map-scroll{display:flex;flex-direction:column}#mapSvg,#mapBlk{flex:1 1 auto;min-height:0;height:auto}.map-zoom{position:static;flex-direction:row;justify-content:flex-end;padding:6px 8px;border-top:1px solid var(--line)}.map-zoom button{min-width:38px;height:36px;font-size:20px}}
 #mapSvg .mb{cursor:pointer}
 #mapSvg .mb .fl{fill:var(--teal-soft)}
 #mapSvg .mb .ed{fill:none;stroke:var(--teal);stroke-width:.45}
@@ -126,9 +132,10 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 #mapSvg .mb.ph2 .fl{fill:var(--sun-soft)}
 #mapSvg .mb.ph2 .ed{stroke:var(--sun)}
 #mapSvg .mb.uncertain .ed{stroke-dasharray:1.5 1}
-#mapSvg .mb text{fill:var(--ink);text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:1.6px;stroke-linejoin:round}
-#mapSvg .mb .num{font-size:11px;font-weight:700}
-#mapSvg .mb .fr{font-size:5.6px;fill:var(--muted)}
+#mapSvg .mb text{fill:var(--ink);text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:1px;stroke-linejoin:round}
+/* подписи блоков: не больше 16 и 11 пикселей на экране, а на мелкой схеме меньше, вместе с блоком */
+#mapSvg .mb .num{font-size:min(7px,calc(var(--u,1) * 16px));font-weight:700}
+#mapSvg .mb .fr{font-size:min(4.2px,calc(var(--u,1) * 11px));fill:var(--muted)}
 #mapSvg .mb:hover .ed{stroke-width:1}
 #mapSvg .mb:focus{outline:none}
 #mapSvg .mb:focus-visible .ed{stroke-width:1.2;stroke:var(--ink)}
@@ -147,7 +154,6 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .map-pan{display:none}
 @media (max-width:860px){.map-pan{display:inline}}
 .map-head .ghost{min-height:34px;padding:0 12px;font-size:14px}
-#mapBlk{display:block;height:auto;font-family:inherit}
 #mapBlk .tc{cursor:pointer}
 #mapBlk .tc rect{fill:var(--soft);stroke:var(--line);stroke-width:.6}
 #mapBlk .tc text{fill:var(--ink);text-anchor:middle;font-size:7.6px;pointer-events:none}
@@ -160,6 +166,15 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 #mapBlk .tb rect{fill:none;stroke:var(--sun);stroke-width:1;stroke-dasharray:2.5 1.5}
 #mapBlk .tb text{fill:var(--sun-ink);text-anchor:middle;font-size:6.4px}
 #mapBlk .lbl{fill:var(--muted);font-size:6.4px;text-anchor:middle}
+#mapBlk .tc.dco rect{fill:var(--sun-soft);stroke:var(--sun);stroke-width:1}
+#mapBlk .dcm{cursor:pointer}
+#mapBlk .dcm rect{fill:var(--panel);stroke:var(--dc);stroke-width:.7}
+#mapBlk .dcm text{fill:var(--dc);font-size:5.4px;font-weight:700;text-anchor:middle;pointer-events:none}
+#mapBlk .dcm.approx rect{stroke-dasharray:1.6 1}
+#mapBlk .dcm.sel rect{fill:var(--dc)}
+#mapBlk .dcm.sel text{fill:var(--dc-ink)}
+.map-legend .l8{width:12px;height:8px;border-color:var(--dc);background:var(--panel)}
+.map-legend .l9{background:var(--sun-soft);border-color:var(--sun)}
 .map-legend .l4{background:var(--teal);border-color:var(--ink)}
 .map-legend .l5{border-style:dashed;border-color:var(--sun)}
 .map-legend .l6{background:#e6d77a;border-color:#c9b94f}

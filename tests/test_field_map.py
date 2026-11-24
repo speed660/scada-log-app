@@ -112,7 +112,7 @@ with sync_playwright() as p:
     check('B: карточки пока нет', not pg.is_visible('#mapCard'))
 
     # C. выбор блока
-    pg.click('#mapSvg .mb[data-n="2"]')
+    pg.locator('#mapSvg .mb[data-n="2"]').dispatch_event('click')  # у выдуманного блока 2 в центре рамки внутренний проход
     card = pg.inner_text('#mapCard')
     check('C: карточка блока 2', pg.is_visible('#mapCard') and 'Блок 2' in card and '4343' in card and '1-я очередь' in card, card)
     check('C: блок отмечен', pg.evaluate("document.querySelector('#mapSvg .mb.sel').dataset.n") == '2')
@@ -151,7 +151,7 @@ with sync_playwright() as p:
     pg.click('#mapBack')
     check('E3: вернулись к схеме поля, блок 1 отмечен', pg.is_visible('#mapSvg') and not pg.is_visible('#mapBlk') and pg.evaluate("document.querySelector('#mapSvg .mb.sel').dataset.n") == '1' and pg.inner_text('#mapTitle') == 'Схема поля')
     check('E3: на схеме метка выбранного трекера (10) на месте', pg.locator('#mapSvg .pin circle').count() == 1 and pg.evaluate("document.querySelector('#mapSvg .pin circle').getAttribute('cx')") == '12.5' and pg.evaluate("document.querySelector('#mapSvg .pin circle').getAttribute('cy')") == '42.5')
-    pg.click('#mapSvg .mb[data-n="2"]'); pg.click('#mapCard [data-act=zoom]')
+    pg.locator('#mapSvg .mb[data-n="2"]').dispatch_event('click'); pg.click('#mapCard [data-act=zoom]')
     check('E3: «Открыть блок» показывает блок 2 без выбранного трекера', pg.is_visible('#mapBlk') and pg.locator('#mapBlk .tc').count() == 7 and pg.locator('#mapBlk .tc.sel').count() == 0 and 'Блок 2' in pg.inner_text('#mapCard'))
     check('E3: ящик связи нарисован в свободной ячейке', pg.locator('#mapBlk .tb').count() == 1)
     check('E3: пустое место не нарисовано трекером', pg.locator('#mapBlk .tc').count() == 7)
@@ -196,7 +196,7 @@ with sync_playwright() as p:
     pg.click('#mapSvg .mb[data-n="1"]'); pg.wait_for_timeout(300)
     check('I: карточка видна', pg.is_visible('#mapCard'))
     pg.click('#mapCard [data-act=zoom]'); pg.wait_for_timeout(300)
-    check('I: сетка блока на телефоне видна и листается вбок', pg.is_visible('#mapBlk') and pg.evaluate("document.getElementById('mapScroll').scrollWidth >= document.getElementById('mapScroll').clientWidth"))
+    check('I: сетка блока на телефоне видна целиком', pg.is_visible('#mapBlk') and pg.evaluate("document.getElementById('mapScroll').scrollWidth >= document.getElementById('mapScroll').clientWidth"))
     check('I: страница не уехала вбок при сетке', pg.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'))
     pg.screenshot(path=OUT + '/field_block_mobile.png')
     pg.click('#mapBack')

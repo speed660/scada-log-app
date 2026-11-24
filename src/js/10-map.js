@@ -88,10 +88,96 @@ function mapLoad() {
   renderMap();
   return mapLoading;
 }
-function mapSeeSel() { const g = $(mapZoom ? 'mapBlk' : 'mapSvg').querySelector('.sel'); if (g && g.scrollIntoView) g.scrollIntoView({ block: 'nearest', inline: 'center' }); }
-function openMap(b, n, zoom) {
+/* Масштаб схемы: колесо мыши, перетаскивание, два пальца, кнопки «+», «−» и «целиком».
+   У схемы поля и у сетки блока свой вид: масштаб s (1 = целиком) и центр. Базовая рамка — data-base у svg. */
+const PZ_MAX = 12, PZ = { views: {}, ptrs: new Map(), last: null, moved: false };
+const pzSvg = () => $(!$('mapBlk').hasAttribute('hidden') ? 'mapBlk' : 'mapSvg');
+const pzBase = svg => svg.dataset.base ? svg.dataset.base.split(' ').map(Number) : null;
+const pzView = svg => PZ.views[svg.id] || { s: 1, cx: null, cy: null };
+function pzApply(svg) {
+  const b = pzBase(svg); if (!b) return;
+  const v = pzView(svg), s = Math.min(Math.max(v.s, 1), PZ_MAX), w = b[2] / s, h = b[3] / s;
+  const cx = Math.min(Math.max(v.cx == null ? b[0] + b[2] / 2 : v.cx, b[0] + w / 2), b[0] + b[2] - w / 2);
+  const cy = Math.min(Math.max(v.cy == null ? b[1] + b[3] / 2 : v.cy, b[1] + h / 2), b[1] + b[3] - h / 2);
+  PZ.views[svg.id] = { s, cx, cy };
+  svg.setAttribute('viewBox', [cx - w / 2, cy - h / 2, w, h].map(x => +x.toFixed(2)).join(' '));
+  svg.style.setProperty('--u', pzUnit(svg).toFixed(4)); // единиц схемы на пиксель экрана: по нему подписи держат размер на экране
+  if (svg === pzSvg()) { $('mapZoomIn').disabled = s >= PZ_MAX - 0.01; $('mapZoomOut').disabled = $('mapFit').disabled = s <= 1.01; }
+}
+function pzFitHeight(svg) { // окно схемы по форме схемы: без пустых полос сверху и снизу, но не ниже 300 px и не выше экрана
+  const b = pzBase(svg), box = $('mapScroll'); if (!b || !box.clientWidth) return;
+  const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--toph')) || 0;
+  const bar = getComputedStyle($('mapZoom')).position === 'static' ? 50 : 0; // на телефоне кнопки под схемой
+  const avail = window.innerHeight - top - 210, want = box.clientWidth * b[3] / b[2] + 16 + bar;
+  box.style.height = Math.round(Math.max(300, Math.min(avail, want))) + 'px';
+}
+function pzSetBase(svg, base) { // при той же рамке вид не сбрасываем: перерисовка после выбора блока не должна прыгать
+  const key = base.map(x => +x.toFixed(2)).join(' ');
+  if (svg.dataset.base !== key) { svg.dataset.base = key; delete PZ.views[svg.id]; }
+  pzFitHeight(svg); pzApply(svg);
+}
+function pzZoomAt(svg, k, px, py) {
+  const v = pzView(svg), b = pzBase(svg); if (!b) return;
+  const s = v.s, s2 = Math.min(Math.max(s * k, 1), PZ_MAX);
+  const cx = v.cx == null ? b[0] + b[2] / 2 : v.cx, cy = v.cy == null ? b[1] + b[3] / 2 : v.cy;
+  if (px == null) { px = cx; py = cy; }
+  PZ.views[svg.id] = { s: s2, cx: px + (cx - px) * s / s2, cy: py + (cy - py) * s / s2 };
+  pzApply(svg);
+}
+function pzFocus(svg, x, y, sMin) { const v = pzView(svg); PZ.views[svg.id] = { s: Math.max(v.s, sMin || 1), cx: x, cy: y }; pzApply(svg); }
+function pzPoint(svg, cx, cy) { const m = svg.getScreenCTM && svg.getScreenCTM(); if (!m) return [null, null]; const p = new DOMPoint(cx, cy).matrixTransform(m.inverse()); return [p.x, p.y]; }
+function pzUnit(svg) { const vb = svg.viewBox.baseVal; return vb && svg.clientWidth ? Math.max(vb.width / svg.clientWidth, vb.height / svg.clientHeight) : 1; }
+$('mapScroll').addEventListener('wheel', e => {
+  const svg = pzSvg(); if (!pzBase(svg)) return;
+  e.preventDefault();
+  const [x, y] = pzPoint(svg, e.clientX, e.clientY);
+  pzZoomAt(svg, Math.exp(-e.deltaY * (e.deltaMode ? 0.06 : 0.0016)), x, y);
+}, { passive: false });
+$('mapScroll').addEventListener('pointerdown', e => {
+  if (e.target.closest('.map-zoom') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  PZ.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); PZ.moved = false; PZ.last = null;
+});
+window.addEventListener('pointermove', e => {
+  const p = PZ.ptrs.get(e.pointerId); if (!p) return;
+  const svg = pzSvg(); if (!pzBase(svg)) return;
+  if (PZ.ptrs.size === 1) {
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (!PZ.moved && Math.hypot(dx, dy) < 6) return;
+    PZ.moved = true; $('mapScroll').classList.add('dragging');
+    const u = pzUnit(svg), v = pzView(svg), b = pzBase(svg);
+    PZ.views[svg.id] = { s: v.s, cx: (v.cx == null ? b[0] + b[2] / 2 : v.cx) - dx * u, cy: (v.cy == null ? b[1] + b[3] / 2 : v.cy) - dy * u };
+    pzApply(svg); p.x = e.clientX; p.y = e.clientY;
+  } else if (PZ.ptrs.size === 2) {
+    p.x = e.clientX; p.y = e.clientY;
+    const [a, c] = [...PZ.ptrs.values()], d = Math.hypot(a.x - c.x, a.y - c.y), mid = [(a.x + c.x) / 2, (a.y + c.y) / 2];
+    if (PZ.last) { const [x, y] = pzPoint(svg, mid[0], mid[1]); pzZoomAt(svg, d / PZ.last, x, y); }
+    PZ.last = d; PZ.moved = true;
+  }
+});
+const pzUp = e => { if (!PZ.ptrs.delete(e.pointerId)) return; PZ.last = null; if (!PZ.ptrs.size) $('mapScroll').classList.remove('dragging'); };
+window.addEventListener('pointerup', pzUp); window.addEventListener('pointercancel', pzUp);
+$('mapScroll').addEventListener('click', e => { if (PZ.moved) { e.stopPropagation(); e.preventDefault(); PZ.moved = false; } }, true); // после перетаскивания клик не выбирает блок
+window.addEventListener('resize', () => { if (!$('mapView').hidden) { pzFitHeight(pzSvg()); pzApply(pzSvg()); } });
+$('mapZoomIn').onclick = () => pzZoomAt(pzSvg(), 1.6);
+$('mapZoomOut').onclick = () => pzZoomAt(pzSvg(), 1 / 1.6);
+$('mapFit').onclick = () => { const svg = pzSvg(); delete PZ.views[svg.id]; pzApply(svg); };
+$('mapView').addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); $('mapZoomIn').click(); }
+  else if (e.key === '-' || e.key === '_') { e.preventDefault(); $('mapZoomOut').click(); }
+  else if (e.key === '0') { e.preventDefault(); $('mapFit').click(); }
+});
+function mapSeeSel() { // найденный трекер на схеме поля приближаем, иначе держим выбранный блок в кадре
+  if (mapZoom || !mapSel || !mapLayout || !trkData) return;
+  const svg = $('mapSvg'), g = mapGeo().blocks.get(mapSel.b); if (!g || !pzBase(svg)) return;
+  const ys = mapLayout.ys, tg = mapSel.n && g.at.get(mapSel.n);
+  if (tg) pzFocus(svg, tg[1] + 0.5, (tg[0] + 0.5) * ys, 4);
+  else if (pzView(svg).s > 1) pzFocus(svg, g.lab[0], g.lab[1] * ys, 1);
+}
+function openMap(b, n, zoom, dc) {
   $('scadaView').hidden = true; closeSheet();
-  mapSel = b ? { b, n: n || 0 } : null;
+  mapSel = b ? { b, n: n || 0, dc: dc || '' } : null;
+  if (!b) delete PZ.views.mapSvg; // кнопка «Карта» без цели — всё поле целиком
   mapZoom = !!(b && zoom);
   $('mapView').hidden = false; markSection();
   mapLoad().then(mapSeeSel);
@@ -115,6 +201,8 @@ function renderMap() {
   const blkSvg = $('mapBlk'), zoomOK = !!(mapZoom && mapSel && trkData && ghToken && trkData.blocks.has(mapSel.b));
   const ready = !!(mapLayout && trkData && ghToken) && !zoomOK;
   if (zoomOK) { msg.hidden = true; $('mapTitle').textContent = 'Блок ' + mapSel.b; } else $('mapTitle').textContent = 'Схема поля';
+  $('mapFit').textContent = zoomOK ? 'Весь блок' : 'Всё поле';
+  $('mapZoom').hidden = !(zoomOK || (mapLayout && trkData && ghToken));
   $('mapBack').hidden = !zoomOK;
   svg.toggleAttribute('hidden', !ready); $('mapLegend').hidden = !ready; // у SVG нет свойства hidden
   if (ready) $('mapUnsure').hidden = !mapLayout.unsure.size;
@@ -124,7 +212,7 @@ function renderMap() {
   if (!ready) { svg.innerHTML = ''; card.innerHTML = ''; card.hidden = true; return; }
   const L = mapLayout, ys = L.ys, G = mapGeo();
   const x0 = G.c0 - 3, y0 = (G.r0 - 1) * ys, x1 = Math.max(G.c1 + 2, ...L.ents.map(e => e.c + 62)), y1 = (G.r1 + 2) * ys;
-  svg.setAttribute('viewBox', [x0, y0, x1 - x0, y1 - y0].join(' '));
+  pzSetBase(svg, [x0, y0, x1 - x0, y1 - y0]);
   let h = '<g class="rd">' + L.roads.map(([r, a, b]) => `<rect x="${a}" y="${r * ys}" width="${b - a + 1}" height="${ys}"/>`).join('') + '</g>';
   for (const [n, g] of G.blocks) {
     const info = trkData.blocks.get(n), cls = info.phase === 1 ? 'ph1' : 'ph2';
@@ -153,20 +241,30 @@ function renderMapBlock(svg, card) {
   const at = b.nums.get(sel), nb = new Set();
   if (at) for (const [dr, dc] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const v = b.pos.get((at[0] + dr) + ',' + (at[1] + dc)); if (v != null) nb.add(v); }
   const W = MB_L + cols * MB_W + 4, H = MB_T + rows * MB_H + 4;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.style.width = Math.max(W * 1.15, 320) + 'px';
+  pzSetBase(svg, [0, 0, W, H]);
+  const D = trkData.dc && trkData.dc.get(b.n), dsel = D && mapSel.dc ? D.boxes.get(mapSel.dc) : null, mine = new Set(dsel ? dsel.trackers : []);
   let h = '';
   for (let c = 1; c <= cols; c++) if (c === 1 || c % 5 === 0) h += `<text class="lbl" x="${MB_L + (c - 0.5) * MB_W}" y="9">${c}</text>`;
   for (let r = 1; r <= rows; r++) h += `<text class="lbl" x="8" y="${MB_T + (r - 0.5) * MB_H + 2.4}">${r}</text>`;
   const first = sel && at ? sel : (b.nums.size ? Math.min(...b.nums.keys()) : 0);
   for (const [n, [r, c]] of b.nums) {
     const x = MB_L + (c - 1) * MB_W, y = MB_T + (r - 1) * MB_H, on = n === sel;
-    h += `<g class="tc${on ? ' sel' : nb.has(n) ? ' nb' : ''}" data-n="${n}" data-r="${r}" data-c="${c}" tabindex="${n === first ? 0 : -1}" role="button" aria-pressed="${on}" aria-label="Трекер ${n}, ряд ${r}, колонка ${c}">` +
+    h += `<g class="tc${on ? ' sel' : nb.has(n) ? ' nb' : mine.has(n) ? ' dco' : ''}" data-n="${n}" data-r="${r}" data-c="${c}" tabindex="${n === first ? 0 : -1}" role="button" aria-pressed="${on}" aria-label="Трекер ${n}, ряд ${r}, колонка ${c}">` +
       `<rect x="${x + 0.6}" y="${y + 0.6}" width="${MB_W - 1.2}" height="${MB_H - 1.2}" rx="2"/><text x="${x + MB_W / 2}" y="${y + MB_H / 2 + 2.6}">${n}</text></g>`;
   }
   const bx = b.box;
   if (bx && !b.pos.has(bx[0] + ',' + bx[1])) { const x = MB_L + (bx[1] - 1) * MB_W, y = MB_T + (bx[0] - 1) * MB_H; h += `<g class="tb"><rect x="${x + 0.6}" y="${y + 0.6}" width="${MB_W - 1.2}" height="${MB_H - 1.2}" rx="2"/><text x="${x + MB_W / 2}" y="${y + MB_H / 2 + 2.2}">ящик</text></g>`; }
+  if (D) { // DC-ящики: метка в правом верхнем углу клетки ближайшего к ящику трекера
+    const used = new Map();
+    for (const x of D.boxes.values()) {
+      const k = x.cell.join(','), i = used.get(k) || 0; used.set(k, i + 1);
+      const cx = MB_L + x.cell[1] * MB_W - 1, cy = MB_T + (x.cell[0] - 1) * MB_H + 1 + i * 8.5, on = dsel && dsel.id === x.id;
+      h += `<g class="dcm${on ? ' sel' : ''}${D.exact ? '' : ' approx'}" data-dc="${esc(x.id)}" tabindex="-1" role="button" aria-pressed="${!!on}" aria-label="DC-ящик ${esc(b.n + '.' + x.id)}">` +
+        `<rect x="${cx - 12}" y="${cy}" width="12" height="7.5" rx="1.5"/><text x="${cx - 6}" y="${cy + 5.6}">${esc(x.id)}</text></g>`;
+    }
+  }
   svg.innerHTML = h;
-  card.innerHTML = trkCardHTML(sel ? { k: 'trk', b: b.n, n: sel } : { k: 'block', b: b.n }, true); card.hidden = false;
+  card.innerHTML = dsel ? dcCardHTML({ k: 'dc', b: b.n, id: dsel.id }, true) : trkCardHTML(sel ? { k: 'trk', b: b.n, n: sel } : { k: 'block', b: b.n }, true); card.hidden = false;
 }
 let mapFindItems = [];
 function mapFindDraw() {
@@ -180,7 +278,7 @@ function mapFindChoose(i) {
   const it = mapFindItems[i];
   if (!trkSelectable(it)) return;
   $('mapFind').value = ''; mapFindItems = []; $('mapFindList').hidden = true;
-  openMap(it.b, it.k === 'trk' ? it.n : 0, it.k === 'trk');
+  openMap(it.b, it.k === 'trk' ? it.n : 0, it.k === 'trk' || it.k === 'dc', it.k === 'dc' ? it.id : '');
 }
 $('mapFind').addEventListener('input', mapFindDraw);
 $('mapFind').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const i = mapFindItems.findIndex(trkSelectable); if (i >= 0) mapFindChoose(i); } else if (e.key === 'Escape' && $('mapFind').value) { e.stopPropagation(); $('mapFind').value = ''; mapFindDraw(); } });
@@ -188,15 +286,21 @@ $('mapFindList').addEventListener('mousedown', e => e.preventDefault());
 $('mapFindList').addEventListener('click', e => { const o = e.target.closest('[data-i]'); if (o) mapFindChoose(+o.dataset.i); });
 function mapPickTrk(g) {
   if (!g) return;
-  mapSel = { b: mapSel.b, n: +g.dataset.n };
+  mapSel = { b: mapSel.b, n: +g.dataset.n, dc: '' };
   renderMap();
   const again = $('mapBlk').querySelector('.tc.sel'); if (again) again.focus({ preventScroll: true });
+  if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
+}
+function mapPickDc(g) {
+  if (!g) return;
+  mapSel = { b: mapSel.b, n: 0, dc: mapSel.dc === g.dataset.dc ? '' : g.dataset.dc }; // повторный клик снимает выбор
+  renderMap();
   if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
 }
 function mapBack() { if (!mapZoom) return; mapZoom = false; renderMap(); mapSeeSel(); }
 function mapPick(g) {
   if (!g) return;
-  mapSel = { b: +g.dataset.n, n: 0 };
+  mapSel = { b: +g.dataset.n, n: 0, dc: '' };
   renderMap();
   const again = $('mapSvg').querySelector('.mb.sel'); if (again) again.focus({ preventScroll: true });
   if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });

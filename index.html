@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-WIeLDh/Eib3aDYXsCYWJ8fSbEvnIAaEJNxHPjGhNUvI='; style-src 'unsafe-inline'; img-src data: blob:; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zy8WdotDAVFTfHt0i9JQdQf7Rv5q5P3dmE9jWrj67Qg='; style-src 'unsafe-inline'; img-src data: blob:; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
 <title>Журнал диспетчера</title>
 <style>
 :root{
   --paper:#eef2f4;--panel:#ffffff;--ink:#17262f;--muted:#5d6f7a;--line:#d5dde2;--soft:#e5ebee;
   --teal:#0e6e78;--teal-ink:#ffffff;--teal-soft:#dbeef0;
   --sun:#c97f06;--sun-soft:#fbefd9;--sun-ink:#6e4500;
-  --ok:#2f8a57;--danger:#b8402f;
+  --ok:#2f8a57;--danger:#b8402f;--dc:var(--dc);--dc-ink:#ffffff;
   --tag-s:55%;--tag-l:91%;--tag-tl:27%;
   --r-s:6px;--r-m:10px;--r-l:16px;
   --shadow:0 10px 30px rgba(18,38,48,.14);
@@ -20,7 +20,7 @@
   --paper:#10181c;--panel:#172127;--ink:#e4ecef;--muted:#8fa1ab;--line:#26343b;--soft:#1e2a30;
   --teal:#36b0ba;--teal-ink:#05282c;--teal-soft:#15343a;
   --sun:#f2b13a;--sun-soft:#33270f;--sun-ink:#f8d48a;
-  --ok:#5cc58a;--danger:#f07a66;
+  --ok:#5cc58a;--danger:#f07a66;--dc:#c39bea;--dc-ink:#1d0f2b;
   --tag-s:38%;--tag-l:22%;--tag-tl:80%;
   --shadow:0 10px 30px rgba(0,0,0,.45);
   color-scheme:dark;
@@ -123,8 +123,14 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .map-head h2{font-size:18px}
 .map-sub{color:var(--muted);font-size:13px;flex:1}
 .map-msg{margin:12px 16px 0;color:var(--muted);font-size:14px}
-.map-scroll{overflow:auto;padding:12px 16px;-webkit-overflow-scrolling:touch}
-#mapSvg{display:block;width:max(100%,940px);height:auto;font-family:inherit}
+.map-scroll{position:relative;flex:0 0 auto;height:max(300px,calc(100dvh - var(--toph,0px) - 210px));margin:10px 16px 0;border:1px solid var(--line);border-radius:var(--r-m);background:var(--panel);overflow:hidden}
+.map-scroll.dragging,.map-scroll.dragging *{cursor:grabbing!important}
+#mapSvg,#mapBlk{display:block;width:100%;height:100%;font-family:inherit;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.map-zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.map-zoom button{min-width:40px;height:40px;border-radius:var(--r-m);border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:22px;font-weight:700;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer}
+.map-zoom button.fit{font-size:13px;font-weight:600;padding:0 10px}
+.map-zoom button:disabled{opacity:.45;cursor:default}
+@media (max-width:860px){.map-scroll{display:flex;flex-direction:column}#mapSvg,#mapBlk{flex:1 1 auto;min-height:0;height:auto}.map-zoom{position:static;flex-direction:row;justify-content:flex-end;padding:6px 8px;border-top:1px solid var(--line)}.map-zoom button{min-width:38px;height:36px;font-size:20px}}
 #mapSvg .mb{cursor:pointer}
 #mapSvg .mb .fl{fill:var(--teal-soft)}
 #mapSvg .mb .ed{fill:none;stroke:var(--teal);stroke-width:.45}
@@ -134,9 +140,10 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 #mapSvg .mb.ph2 .fl{fill:var(--sun-soft)}
 #mapSvg .mb.ph2 .ed{stroke:var(--sun)}
 #mapSvg .mb.uncertain .ed{stroke-dasharray:1.5 1}
-#mapSvg .mb text{fill:var(--ink);text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:1.6px;stroke-linejoin:round}
-#mapSvg .mb .num{font-size:11px;font-weight:700}
-#mapSvg .mb .fr{font-size:5.6px;fill:var(--muted)}
+#mapSvg .mb text{fill:var(--ink);text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:1px;stroke-linejoin:round}
+/* подписи блоков: не больше 16 и 11 пикселей на экране, а на мелкой схеме меньше, вместе с блоком */
+#mapSvg .mb .num{font-size:min(7px,calc(var(--u,1) * 16px));font-weight:700}
+#mapSvg .mb .fr{font-size:min(4.2px,calc(var(--u,1) * 11px));fill:var(--muted)}
 #mapSvg .mb:hover .ed{stroke-width:1}
 #mapSvg .mb:focus{outline:none}
 #mapSvg .mb:focus-visible .ed{stroke-width:1.2;stroke:var(--ink)}
@@ -155,7 +162,6 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .map-pan{display:none}
 @media (max-width:860px){.map-pan{display:inline}}
 .map-head .ghost{min-height:34px;padding:0 12px;font-size:14px}
-#mapBlk{display:block;height:auto;font-family:inherit}
 #mapBlk .tc{cursor:pointer}
 #mapBlk .tc rect{fill:var(--soft);stroke:var(--line);stroke-width:.6}
 #mapBlk .tc text{fill:var(--ink);text-anchor:middle;font-size:7.6px;pointer-events:none}
@@ -168,6 +174,15 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 #mapBlk .tb rect{fill:none;stroke:var(--sun);stroke-width:1;stroke-dasharray:2.5 1.5}
 #mapBlk .tb text{fill:var(--sun-ink);text-anchor:middle;font-size:6.4px}
 #mapBlk .lbl{fill:var(--muted);font-size:6.4px;text-anchor:middle}
+#mapBlk .tc.dco rect{fill:var(--sun-soft);stroke:var(--sun);stroke-width:1}
+#mapBlk .dcm{cursor:pointer}
+#mapBlk .dcm rect{fill:var(--panel);stroke:var(--dc);stroke-width:.7}
+#mapBlk .dcm text{fill:var(--dc);font-size:5.4px;font-weight:700;text-anchor:middle;pointer-events:none}
+#mapBlk .dcm.approx rect{stroke-dasharray:1.6 1}
+#mapBlk .dcm.sel rect{fill:var(--dc)}
+#mapBlk .dcm.sel text{fill:var(--dc-ink)}
+.map-legend .l8{width:12px;height:8px;border-color:var(--dc);background:var(--panel)}
+.map-legend .l9{background:var(--sun-soft);border-color:var(--sun)}
 .map-legend .l4{background:var(--teal);border-color:var(--ink)}
 .map-legend .l5{border-style:dashed;border-color:var(--sun)}
 .map-legend .l6{background:#e6d77a;border-color:#c9b94f}
@@ -476,10 +491,11 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
     <button type="button" class="x-btn" id="mapClose" aria-label="Закрыть схему"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <p class="map-msg" id="mapMsg"></p>
-  <div class="map-find"><input id="mapFind" type="search" placeholder="Найти трекер: 13-87 или блок 13" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Найти трекер или блок" disabled><div class="who-list" id="mapFindList" role="listbox" hidden></div></div>
-  <div class="map-scroll" id="mapScroll"><svg id="mapSvg" role="group" aria-label="Схема блоков поля" hidden></svg><svg id="mapBlk" role="group" aria-label="Трекеры блока" hidden></svg></div>
-  <div class="map-legend" id="mapLegend" hidden><span><i class="l1"></i>1-я очередь</span><span><i class="l2"></i>2-я очередь</span><span id="mapUnsure"><i class="l3"></i>положение блока не подтверждено</span><span><i class="l6"></i>дороги</span><span><i class="l7"></i>ящик связи</span><span class="map-pan">Схему можно листать вбок</span></div>
-  <div class="map-legend" id="mapLegend2" hidden><span><i class="l4"></i>выбранный трекер</span><span><i class="l1"></i>соседние</span><span><i class="l5"></i>ящик связи блока</span><span>ряд 1 сверху, как в таблице станции; пустое место — нет трекера</span><span class="map-pan">Сетку можно листать вбок</span></div>
+  <div class="map-find"><input id="mapFind" type="search" placeholder="Найти: 13-87, блок 13, DC-ящик 13.07" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Найти трекер или блок" disabled><div class="who-list" id="mapFindList" role="listbox" hidden></div></div>
+  <div class="map-scroll" id="mapScroll"><svg id="mapSvg" role="group" aria-label="Схема блоков поля" preserveAspectRatio="xMidYMid meet" hidden></svg><svg id="mapBlk" role="group" aria-label="Трекеры блока" preserveAspectRatio="xMidYMid meet" hidden></svg>
+    <div class="map-zoom" id="mapZoom" role="group" aria-label="Масштаб схемы" hidden><button type="button" id="mapZoomIn" aria-label="Приблизить" title="Приблизить (+)">+</button><button type="button" id="mapZoomOut" aria-label="Отдалить" title="Отдалить (−)">−</button><button type="button" class="fit" id="mapFit" title="Показать целиком (0)">Всё поле</button></div></div>
+  <div class="map-legend" id="mapLegend" hidden><span><i class="l1"></i>1-я очередь</span><span><i class="l2"></i>2-я очередь</span><span id="mapUnsure"><i class="l3"></i>положение блока не подтверждено</span><span><i class="l6"></i>дороги</span><span><i class="l7"></i>ящик связи</span><span class="map-pan">Схему можно приближать двумя пальцами</span></div>
+  <div class="map-legend" id="mapLegend2" hidden><span><i class="l4"></i>выбранный трекер</span><span><i class="l1"></i>соседние</span><span><i class="l5"></i>ящик связи блока</span><span><i class="l8"></i>DC-ящик (номер)</span><span><i class="l9"></i>трекеры выбранного DC-ящика</span><span>ряд 1 сверху, как в таблице станции; пустое место — нет трекера</span><span class="map-pan">Сетку можно приближать двумя пальцами</span></div>
   <div class="trk-card" id="mapCard" aria-live="polite" hidden></div>
 </div>
 
@@ -1872,7 +1888,7 @@ $('form').addEventListener('submit', e => { e.preventDefault(); saveEntry(); });
 /* ---------- Поиск трекера ---------- */
 /* Данные станции лежат в приватном репозитории (map/trackers.json) и держатся только в памяти вкладки:
    «Заблокировать» и отключение GitHub их стирают. В браузере и в публичном репозитории их нет. */
-const TRK_FILE = 'map/trackers.json', TRK_FIXES = 'map/corrections.json';
+const TRK_FILE = 'map/trackers.json', TRK_FIXES = 'map/corrections.json', DC_FILE = 'map/dc.json';
 let mapLayout = null, mapSel = null, mapErr = '', mapLoading = null, mapZoom = false;
 let trkData = null, trkErr = '', trkLoading = null, trkItems = [], trkActive = -1, trkSel = null;
 const nfmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -1901,6 +1917,39 @@ function trkBuild(d, fx) {
   const fixes = fx && Array.isArray(fx.items) ? fx.items.filter(i => i && Number.isInteger(i.block) && i.status !== 'rejected') : [];
   return { blocks, total, fixes };
 }
+/* DC-ящики (комбайнер-боксы, 汇流箱) из map/dc.json: место ящика на сетке блока и, где на чертеже подписаны стринги, его трекеры.
+   Файл могут менять все, у кого есть токен, поэтому в дело идут только проверенные числа и номера вида «07». */
+function dcBuild(d, td) {
+  const out = new Map(), int = v => Number.isInteger(v) && v >= 0;
+  if (!d || d.app !== 'scada-map-dc' || !Array.isArray(d.blocks)) return out;
+  for (const b of d.blocks) {
+    if (!b || !int(b.n) || !td.blocks.has(b.n) || !Array.isArray(b.boxes)) continue;
+    const boxes = new Map(), owner = new Map();
+    for (const x of b.boxes) {
+      if (!x || typeof x.id !== 'string' || !/^\d{2}$/.test(x.id) || !Array.isArray(x.cell) || x.cell.length < 2 || !int(x.cell[0]) || !int(x.cell[1])) continue;
+      const trs = Array.isArray(x.trackers) ? x.trackers.filter(int) : [];
+      boxes.set(x.id, { id: x.id, cell: [x.cell[0], x.cell[1]], near: int(x.near) ? x.near : 0, trackers: trs });
+      for (const t of trs) owner.set(t, x.id);
+    }
+    if (boxes.size) out.set(b.n, { exact: b.source === 'подписи', boxes, owner });
+  }
+  return out;
+}
+const dcRanges = a => { // [1,2,3,7,9,10] → «1–3, 7, 9–10»
+  const s = [...a].sort((x, y) => x - y), out = [];
+  for (let i = 0; i < s.length; i++) { let j = i; while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++; out.push(i === j ? '' + s[i] : s[i] + '–' + s[j]); i = j; }
+  return out.join(', ');
+};
+/* Запрос DC-ящика: «13.07», «дс 13 07», «бокс 13-07», «13.07.05» (стринг). Без слова понимаем только запись через точку. */
+function dcParse(q) {
+  const s = String(q || '').toLowerCase().replace(/ё/g, 'е').trim();
+  const word = /(^|[^a-zа-я])(dc|дс|дисбокс|бокс|ящик|комбайнер)/.test(s) || s.includes('汇流箱');
+  const m = s.match(/(\d{1,2})\s*[.\s/-]\s*(\d{1,2})(?:\s*[.-]\s*(\d{1,2}))?/);
+  if (!m) return null;
+  const dot = /^[^\d]*\d{1,2}\.\d{2}(\.\d{1,2})?[^\d]*$/.test(s);
+  if (!word && !dot) return null;
+  return { b: +m[1], id: String(+m[2]).padStart(2, '0'), s: m[3] ? String(+m[3]).padStart(2, '0') : '', only: word || !!m[3] };
+}
 function trkLoad() {
   if (trkData) return Promise.resolve(true);
   if (!ghReady()) { renderTrk(); return Promise.resolve(false); }
@@ -1911,8 +1960,11 @@ function trkLoad() {
       const d = await trkFile(TRK_FILE, false);
       let fx = null;
       try { fx = await trkFile(TRK_FIXES, true); } catch (e) { fx = null; } // список поправок не обязателен
+      let dc = null;
+      try { dc = await trkFile(DC_FILE, true); } catch (e) { dc = null; } // DC-ящики тоже необязательны
       if (!ghToken) return false; // пока грузили, GitHub заблокировали: данные не оставляем
       trkData = trkBuild(d, fx);
+      trkData.dc = dcBuild(dc, trkData);
       return true;
     } catch (e) { trkData = null; trkErr = (e && e.message) || 'неизвестная ошибка'; return false; }
     finally { trkLoading = null; renderTrk(); renderGh(); }
@@ -1955,6 +2007,17 @@ function trkParse(q) {
 }
 function trkHits(n) { return [...trkData.blocks.values()].filter(x => x.nums.has(n)).map(x => x.n); }
 function trkResolve(q) {
+  const dq = trkData && trkData.dc && trkData.dc.size ? dcParse(q) : null;
+  let dcIt = null;
+  if (dq) {
+    const D = trkData.dc.get(dq.b), box = D && D.boxes.get(dq.id);
+    dcIt = box ? { k: 'dc', b: dq.b, id: dq.id, n: box.near, s: dq.s } : trkData.blocks.has(dq.b) ? { k: 'nodc', b: dq.b, id: dq.id, has: !!D } : null;
+    if (dq.only) return dcIt ? [dcIt] : [];
+  }
+  const res = trkResolveTrk(q);
+  return dcIt ? [dcIt, ...res] : res;
+}
+function trkResolveTrk(q) {
   const p = trkParse(q);
   if (!p || !trkData) return [];
   const B = trkData.blocks, out = [], tops = () => { const ks = [...B.keys()]; return Math.min(...ks) + '–' + Math.max(...ks); };
@@ -1971,17 +2034,29 @@ function trkResolve(q) {
   if (p.tr != null) byTracker(p.tr);
   return out;
 }
-const trkSelectable = it => it && (it.k === 'trk' || it.k === 'block');
-const trkLabel = it => it.k === 'block' ? 'Блок ' + it.b : 'Блок ' + it.b + ' · трекер ' + it.n;
+const trkSelectable = it => it && (it.k === 'trk' || it.k === 'block' || it.k === 'dc');
+const trkLabel = it => it.k === 'block' ? 'Блок ' + it.b : it.k === 'dc' ? 'Блок ' + it.b + ' · DC-ящик ' + it.id : 'Блок ' + it.b + ' · трекер ' + it.n;
 function trkNear(b, r, c) {
   const at = (rr, cc) => b.pos.get(rr + ',' + cc);
   const side = d => { for (let k = 1; k <= 3; k++) { const v = at(r, c + d * k); if (v != null) return v; } };
   return { 'слева': side(-1), 'справа': side(1), 'выше': at(r - 1, c), 'ниже': at(r + 1, c) };
 }
 const trkNumOf = s => { const m = /TRK0*(\d+)/i.exec(String(s || '')); return m ? +m[1] : null; };
+function dcCardHTML(it, inMap) {
+  const b = trkData && trkData.blocks.get(it.b), D = trkData && trkData.dc && trkData.dc.get(it.b), x = D && D.boxes.get(it.id);
+  if (!b || !x) return '';
+  const rows = [`<dt>Где</dt><dd>${x.near ? 'у трекера ' + x.near + ', ' : ''}ряд ${x.cell[0]}, колонка ${x.cell[1]}${D.exact ? '' : ' (±1 трекер)'}</dd>`];
+  if (x.trackers.length) rows.push(`<dt>Трекеры ящика</dt><dd>${x.trackers.length}: ${esc(dcRanges(x.trackers))}</dd>`);
+  if (it.s) rows.push(`<dt>Стринг</dt><dd>${esc(b.n + '.' + x.id + '.' + it.s)}</dd>`);
+  const foot = '<p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' : 'По чертежу постоянного тока без подписей стрингов: место примерное, список трекеров неизвестен.') + '</p>';
+  const acts = inMap ? '' : `<div class="trk-acts"><button type="button" class="ghost" data-act="map" data-b="${b.n}" data-dc="${esc(x.id)}">Показать на схеме</button></div>`;
+  return `<h4>${esc('Блок ' + b.n + ' · DC-ящик ' + x.id)}<small>${esc(b.n + '.' + x.id)}</small></h4><dl>${rows.join('')}</dl>${foot}${acts}`;
+}
 function trkCardHTML(it, inMap) {
+  if (it && it.k === 'dc') return dcCardHTML(it, inMap);
   const b = trkData && trkData.blocks.get(it.b);
   if (!b) return '';
+  const D = trkData.dc && trkData.dc.get(b.n);
   const phase = b.phase === 1 ? '1-я очередь' : b.phase === 2 ? '2-я очередь' : '';
   const fixLine = f => `<p class="trk-warn">Замечание к таблице (не подтверждено): ${esc(f.found)} → ${esc(f.proposed)}</p>`;
   const zones = `внешних ${b.outer}, внутренних ${b.inner}, глубинных ${b.deep}` + (b.half ? `, полукомплектов ${b.half}` : '');
@@ -1993,6 +2068,7 @@ function trkCardHTML(it, inMap) {
     rows.push(`<dt>Трекеров</dt><dd>${b.nums.size}${b.range ? ' (номера ' + esc(b.range) + ')' : ''}</dd>`);
     rows.push(`<dt>На схеме</dt><dd>${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок</dd>`);
     rows.push(`<dt>Зоны ветра</dt><dd>${zones}</dd>`);
+    if (trkData.dc && trkData.dc.size) rows.push(`<dt>DC-ящики</dt><dd>${D ? D.boxes.size + (D.exact ? '' : ' (места примерные)') : 'ещё не размечены'}</dd>`);
     warn = trkData.fixes.filter(f => f.block === b.n).map(fixLine).join('');
   } else {
     head = `Блок ${b.n} · трекер ${it.n}`; loc = `Блок ${b.n}, трекер ${it.n}`;
@@ -2003,6 +2079,7 @@ function trkCardHTML(it, inMap) {
       rows.push(`<dt>В блоке</dt><dd>ряд ${pos[0]}, колонка ${pos[1]} (всего ${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок)</dd>`);
       const near = Object.entries(trkNear(b, pos[0], pos[1])).filter(([, v]) => v != null).map(([k, v]) => k + ' ' + v).join(', ');
       if (near) rows.push(`<dt>Рядом</dt><dd>${esc(near)}</dd>`);
+      if (D && D.owner.has(it.n)) rows.push(`<dt>DC-ящик</dt><dd>${esc(b.n + '.' + D.owner.get(it.n))}</dd>`);
       rows.push(`<dt>Зоны ветра блока</dt><dd>${zones}</dd>`);
     } else {
       rows.length = 0;
@@ -2035,6 +2112,8 @@ function trkRowsHTML(items, active) {
       const b = trkData.blocks.get(it.b), pos = b.nums.get(it.n);
       return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · трекер ${it.n}</b><small>${pos ? 'ряд ' + pos[0] + ', колонка ' + pos[1] : 'нет в таблице'}</small></div>`;
     }
+    if (it.k === 'dc') return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · DC-ящик ${esc(it.id)}</b><small>${it.s ? esc('стринг ' + it.s) + (it.n ? ', ' : '') : ''}${it.n ? 'у трекера ' + it.n : ''}</small></div>`;
+    if (it.k === 'nodc') return `<div class="opt muted" role="option" aria-disabled="true">${esc(it.has ? `В блоке ${it.b} нет DC-ящика ${it.id}` : `DC-ящики блока ${it.b} ещё не размечены`)}</div>`;
     const t = it.k === 'more' ? `Трекер ${it.n} есть ещё в блоках: ${it.c}. Добавь номер блока`
       : it.k === 'none' ? `Трекера ${it.n} нет ни в одном блоке` : it.k === 'nob' ? `Блока ${it.b} нет (блоки ${it.r})` : 'Не понял. Пример: 13-87 или блок 13 трекер 87';
     return `<div class="opt muted" role="option" aria-disabled="true">${esc(t)}</div>`;
@@ -2082,7 +2161,7 @@ $('trkList').addEventListener('click', e => { const o = e.target.closest('[data-
 document.addEventListener('click', e => {
   const a = e.target.closest('#trkCard [data-act], #trkNote [data-act], #mapCard [data-act], #mapMsg [data-act]');
   if (!a) return;
-  if (a.dataset.act === 'map') openMap(+a.dataset.b, +a.dataset.n || 0, !!a.dataset.n);
+  if (a.dataset.act === 'map') openMap(+a.dataset.b, +a.dataset.n || 0, !!(a.dataset.n || a.dataset.dc), a.dataset.dc || '');
   else if (a.dataset.act === 'zoom') { mapZoom = true; renderMap(); mapSeeSel(); }
   else if (a.dataset.act === 'fill') { closeMap(); $('fLoc').value = a.dataset.loc; $('fLoc').dispatchEvent(new Event('input', { bubbles: true })); toast('Подставлено в «Место»: ' + a.dataset.loc); $('fLoc').focus(); }
   else if (a.dataset.act === 'unlock') ghUnlock();
@@ -2179,10 +2258,96 @@ function mapLoad() {
   renderMap();
   return mapLoading;
 }
-function mapSeeSel() { const g = $(mapZoom ? 'mapBlk' : 'mapSvg').querySelector('.sel'); if (g && g.scrollIntoView) g.scrollIntoView({ block: 'nearest', inline: 'center' }); }
-function openMap(b, n, zoom) {
+/* Масштаб схемы: колесо мыши, перетаскивание, два пальца, кнопки «+», «−» и «целиком».
+   У схемы поля и у сетки блока свой вид: масштаб s (1 = целиком) и центр. Базовая рамка — data-base у svg. */
+const PZ_MAX = 12, PZ = { views: {}, ptrs: new Map(), last: null, moved: false };
+const pzSvg = () => $(!$('mapBlk').hasAttribute('hidden') ? 'mapBlk' : 'mapSvg');
+const pzBase = svg => svg.dataset.base ? svg.dataset.base.split(' ').map(Number) : null;
+const pzView = svg => PZ.views[svg.id] || { s: 1, cx: null, cy: null };
+function pzApply(svg) {
+  const b = pzBase(svg); if (!b) return;
+  const v = pzView(svg), s = Math.min(Math.max(v.s, 1), PZ_MAX), w = b[2] / s, h = b[3] / s;
+  const cx = Math.min(Math.max(v.cx == null ? b[0] + b[2] / 2 : v.cx, b[0] + w / 2), b[0] + b[2] - w / 2);
+  const cy = Math.min(Math.max(v.cy == null ? b[1] + b[3] / 2 : v.cy, b[1] + h / 2), b[1] + b[3] - h / 2);
+  PZ.views[svg.id] = { s, cx, cy };
+  svg.setAttribute('viewBox', [cx - w / 2, cy - h / 2, w, h].map(x => +x.toFixed(2)).join(' '));
+  svg.style.setProperty('--u', pzUnit(svg).toFixed(4)); // единиц схемы на пиксель экрана: по нему подписи держат размер на экране
+  if (svg === pzSvg()) { $('mapZoomIn').disabled = s >= PZ_MAX - 0.01; $('mapZoomOut').disabled = $('mapFit').disabled = s <= 1.01; }
+}
+function pzFitHeight(svg) { // окно схемы по форме схемы: без пустых полос сверху и снизу, но не ниже 300 px и не выше экрана
+  const b = pzBase(svg), box = $('mapScroll'); if (!b || !box.clientWidth) return;
+  const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--toph')) || 0;
+  const bar = getComputedStyle($('mapZoom')).position === 'static' ? 50 : 0; // на телефоне кнопки под схемой
+  const avail = window.innerHeight - top - 210, want = box.clientWidth * b[3] / b[2] + 16 + bar;
+  box.style.height = Math.round(Math.max(300, Math.min(avail, want))) + 'px';
+}
+function pzSetBase(svg, base) { // при той же рамке вид не сбрасываем: перерисовка после выбора блока не должна прыгать
+  const key = base.map(x => +x.toFixed(2)).join(' ');
+  if (svg.dataset.base !== key) { svg.dataset.base = key; delete PZ.views[svg.id]; }
+  pzFitHeight(svg); pzApply(svg);
+}
+function pzZoomAt(svg, k, px, py) {
+  const v = pzView(svg), b = pzBase(svg); if (!b) return;
+  const s = v.s, s2 = Math.min(Math.max(s * k, 1), PZ_MAX);
+  const cx = v.cx == null ? b[0] + b[2] / 2 : v.cx, cy = v.cy == null ? b[1] + b[3] / 2 : v.cy;
+  if (px == null) { px = cx; py = cy; }
+  PZ.views[svg.id] = { s: s2, cx: px + (cx - px) * s / s2, cy: py + (cy - py) * s / s2 };
+  pzApply(svg);
+}
+function pzFocus(svg, x, y, sMin) { const v = pzView(svg); PZ.views[svg.id] = { s: Math.max(v.s, sMin || 1), cx: x, cy: y }; pzApply(svg); }
+function pzPoint(svg, cx, cy) { const m = svg.getScreenCTM && svg.getScreenCTM(); if (!m) return [null, null]; const p = new DOMPoint(cx, cy).matrixTransform(m.inverse()); return [p.x, p.y]; }
+function pzUnit(svg) { const vb = svg.viewBox.baseVal; return vb && svg.clientWidth ? Math.max(vb.width / svg.clientWidth, vb.height / svg.clientHeight) : 1; }
+$('mapScroll').addEventListener('wheel', e => {
+  const svg = pzSvg(); if (!pzBase(svg)) return;
+  e.preventDefault();
+  const [x, y] = pzPoint(svg, e.clientX, e.clientY);
+  pzZoomAt(svg, Math.exp(-e.deltaY * (e.deltaMode ? 0.06 : 0.0016)), x, y);
+}, { passive: false });
+$('mapScroll').addEventListener('pointerdown', e => {
+  if (e.target.closest('.map-zoom') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  PZ.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); PZ.moved = false; PZ.last = null;
+});
+window.addEventListener('pointermove', e => {
+  const p = PZ.ptrs.get(e.pointerId); if (!p) return;
+  const svg = pzSvg(); if (!pzBase(svg)) return;
+  if (PZ.ptrs.size === 1) {
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (!PZ.moved && Math.hypot(dx, dy) < 6) return;
+    PZ.moved = true; $('mapScroll').classList.add('dragging');
+    const u = pzUnit(svg), v = pzView(svg), b = pzBase(svg);
+    PZ.views[svg.id] = { s: v.s, cx: (v.cx == null ? b[0] + b[2] / 2 : v.cx) - dx * u, cy: (v.cy == null ? b[1] + b[3] / 2 : v.cy) - dy * u };
+    pzApply(svg); p.x = e.clientX; p.y = e.clientY;
+  } else if (PZ.ptrs.size === 2) {
+    p.x = e.clientX; p.y = e.clientY;
+    const [a, c] = [...PZ.ptrs.values()], d = Math.hypot(a.x - c.x, a.y - c.y), mid = [(a.x + c.x) / 2, (a.y + c.y) / 2];
+    if (PZ.last) { const [x, y] = pzPoint(svg, mid[0], mid[1]); pzZoomAt(svg, d / PZ.last, x, y); }
+    PZ.last = d; PZ.moved = true;
+  }
+});
+const pzUp = e => { if (!PZ.ptrs.delete(e.pointerId)) return; PZ.last = null; if (!PZ.ptrs.size) $('mapScroll').classList.remove('dragging'); };
+window.addEventListener('pointerup', pzUp); window.addEventListener('pointercancel', pzUp);
+$('mapScroll').addEventListener('click', e => { if (PZ.moved) { e.stopPropagation(); e.preventDefault(); PZ.moved = false; } }, true); // после перетаскивания клик не выбирает блок
+window.addEventListener('resize', () => { if (!$('mapView').hidden) { pzFitHeight(pzSvg()); pzApply(pzSvg()); } });
+$('mapZoomIn').onclick = () => pzZoomAt(pzSvg(), 1.6);
+$('mapZoomOut').onclick = () => pzZoomAt(pzSvg(), 1 / 1.6);
+$('mapFit').onclick = () => { const svg = pzSvg(); delete PZ.views[svg.id]; pzApply(svg); };
+$('mapView').addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); $('mapZoomIn').click(); }
+  else if (e.key === '-' || e.key === '_') { e.preventDefault(); $('mapZoomOut').click(); }
+  else if (e.key === '0') { e.preventDefault(); $('mapFit').click(); }
+});
+function mapSeeSel() { // найденный трекер на схеме поля приближаем, иначе держим выбранный блок в кадре
+  if (mapZoom || !mapSel || !mapLayout || !trkData) return;
+  const svg = $('mapSvg'), g = mapGeo().blocks.get(mapSel.b); if (!g || !pzBase(svg)) return;
+  const ys = mapLayout.ys, tg = mapSel.n && g.at.get(mapSel.n);
+  if (tg) pzFocus(svg, tg[1] + 0.5, (tg[0] + 0.5) * ys, 4);
+  else if (pzView(svg).s > 1) pzFocus(svg, g.lab[0], g.lab[1] * ys, 1);
+}
+function openMap(b, n, zoom, dc) {
   $('scadaView').hidden = true; closeSheet();
-  mapSel = b ? { b, n: n || 0 } : null;
+  mapSel = b ? { b, n: n || 0, dc: dc || '' } : null;
+  if (!b) delete PZ.views.mapSvg; // кнопка «Карта» без цели — всё поле целиком
   mapZoom = !!(b && zoom);
   $('mapView').hidden = false; markSection();
   mapLoad().then(mapSeeSel);
@@ -2206,6 +2371,8 @@ function renderMap() {
   const blkSvg = $('mapBlk'), zoomOK = !!(mapZoom && mapSel && trkData && ghToken && trkData.blocks.has(mapSel.b));
   const ready = !!(mapLayout && trkData && ghToken) && !zoomOK;
   if (zoomOK) { msg.hidden = true; $('mapTitle').textContent = 'Блок ' + mapSel.b; } else $('mapTitle').textContent = 'Схема поля';
+  $('mapFit').textContent = zoomOK ? 'Весь блок' : 'Всё поле';
+  $('mapZoom').hidden = !(zoomOK || (mapLayout && trkData && ghToken));
   $('mapBack').hidden = !zoomOK;
   svg.toggleAttribute('hidden', !ready); $('mapLegend').hidden = !ready; // у SVG нет свойства hidden
   if (ready) $('mapUnsure').hidden = !mapLayout.unsure.size;
@@ -2215,7 +2382,7 @@ function renderMap() {
   if (!ready) { svg.innerHTML = ''; card.innerHTML = ''; card.hidden = true; return; }
   const L = mapLayout, ys = L.ys, G = mapGeo();
   const x0 = G.c0 - 3, y0 = (G.r0 - 1) * ys, x1 = Math.max(G.c1 + 2, ...L.ents.map(e => e.c + 62)), y1 = (G.r1 + 2) * ys;
-  svg.setAttribute('viewBox', [x0, y0, x1 - x0, y1 - y0].join(' '));
+  pzSetBase(svg, [x0, y0, x1 - x0, y1 - y0]);
   let h = '<g class="rd">' + L.roads.map(([r, a, b]) => `<rect x="${a}" y="${r * ys}" width="${b - a + 1}" height="${ys}"/>`).join('') + '</g>';
   for (const [n, g] of G.blocks) {
     const info = trkData.blocks.get(n), cls = info.phase === 1 ? 'ph1' : 'ph2';
@@ -2244,20 +2411,30 @@ function renderMapBlock(svg, card) {
   const at = b.nums.get(sel), nb = new Set();
   if (at) for (const [dr, dc] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const v = b.pos.get((at[0] + dr) + ',' + (at[1] + dc)); if (v != null) nb.add(v); }
   const W = MB_L + cols * MB_W + 4, H = MB_T + rows * MB_H + 4;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.style.width = Math.max(W * 1.15, 320) + 'px';
+  pzSetBase(svg, [0, 0, W, H]);
+  const D = trkData.dc && trkData.dc.get(b.n), dsel = D && mapSel.dc ? D.boxes.get(mapSel.dc) : null, mine = new Set(dsel ? dsel.trackers : []);
   let h = '';
   for (let c = 1; c <= cols; c++) if (c === 1 || c % 5 === 0) h += `<text class="lbl" x="${MB_L + (c - 0.5) * MB_W}" y="9">${c}</text>`;
   for (let r = 1; r <= rows; r++) h += `<text class="lbl" x="8" y="${MB_T + (r - 0.5) * MB_H + 2.4}">${r}</text>`;
   const first = sel && at ? sel : (b.nums.size ? Math.min(...b.nums.keys()) : 0);
   for (const [n, [r, c]] of b.nums) {
     const x = MB_L + (c - 1) * MB_W, y = MB_T + (r - 1) * MB_H, on = n === sel;
-    h += `<g class="tc${on ? ' sel' : nb.has(n) ? ' nb' : ''}" data-n="${n}" data-r="${r}" data-c="${c}" tabindex="${n === first ? 0 : -1}" role="button" aria-pressed="${on}" aria-label="Трекер ${n}, ряд ${r}, колонка ${c}">` +
+    h += `<g class="tc${on ? ' sel' : nb.has(n) ? ' nb' : mine.has(n) ? ' dco' : ''}" data-n="${n}" data-r="${r}" data-c="${c}" tabindex="${n === first ? 0 : -1}" role="button" aria-pressed="${on}" aria-label="Трекер ${n}, ряд ${r}, колонка ${c}">` +
       `<rect x="${x + 0.6}" y="${y + 0.6}" width="${MB_W - 1.2}" height="${MB_H - 1.2}" rx="2"/><text x="${x + MB_W / 2}" y="${y + MB_H / 2 + 2.6}">${n}</text></g>`;
   }
   const bx = b.box;
   if (bx && !b.pos.has(bx[0] + ',' + bx[1])) { const x = MB_L + (bx[1] - 1) * MB_W, y = MB_T + (bx[0] - 1) * MB_H; h += `<g class="tb"><rect x="${x + 0.6}" y="${y + 0.6}" width="${MB_W - 1.2}" height="${MB_H - 1.2}" rx="2"/><text x="${x + MB_W / 2}" y="${y + MB_H / 2 + 2.2}">ящик</text></g>`; }
+  if (D) { // DC-ящики: метка в правом верхнем углу клетки ближайшего к ящику трекера
+    const used = new Map();
+    for (const x of D.boxes.values()) {
+      const k = x.cell.join(','), i = used.get(k) || 0; used.set(k, i + 1);
+      const cx = MB_L + x.cell[1] * MB_W - 1, cy = MB_T + (x.cell[0] - 1) * MB_H + 1 + i * 8.5, on = dsel && dsel.id === x.id;
+      h += `<g class="dcm${on ? ' sel' : ''}${D.exact ? '' : ' approx'}" data-dc="${esc(x.id)}" tabindex="-1" role="button" aria-pressed="${!!on}" aria-label="DC-ящик ${esc(b.n + '.' + x.id)}">` +
+        `<rect x="${cx - 12}" y="${cy}" width="12" height="7.5" rx="1.5"/><text x="${cx - 6}" y="${cy + 5.6}">${esc(x.id)}</text></g>`;
+    }
+  }
   svg.innerHTML = h;
-  card.innerHTML = trkCardHTML(sel ? { k: 'trk', b: b.n, n: sel } : { k: 'block', b: b.n }, true); card.hidden = false;
+  card.innerHTML = dsel ? dcCardHTML({ k: 'dc', b: b.n, id: dsel.id }, true) : trkCardHTML(sel ? { k: 'trk', b: b.n, n: sel } : { k: 'block', b: b.n }, true); card.hidden = false;
 }
 let mapFindItems = [];
 function mapFindDraw() {
@@ -2271,7 +2448,7 @@ function mapFindChoose(i) {
   const it = mapFindItems[i];
   if (!trkSelectable(it)) return;
   $('mapFind').value = ''; mapFindItems = []; $('mapFindList').hidden = true;
-  openMap(it.b, it.k === 'trk' ? it.n : 0, it.k === 'trk');
+  openMap(it.b, it.k === 'trk' ? it.n : 0, it.k === 'trk' || it.k === 'dc', it.k === 'dc' ? it.id : '');
 }
 $('mapFind').addEventListener('input', mapFindDraw);
 $('mapFind').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const i = mapFindItems.findIndex(trkSelectable); if (i >= 0) mapFindChoose(i); } else if (e.key === 'Escape' && $('mapFind').value) { e.stopPropagation(); $('mapFind').value = ''; mapFindDraw(); } });
@@ -2279,15 +2456,21 @@ $('mapFindList').addEventListener('mousedown', e => e.preventDefault());
 $('mapFindList').addEventListener('click', e => { const o = e.target.closest('[data-i]'); if (o) mapFindChoose(+o.dataset.i); });
 function mapPickTrk(g) {
   if (!g) return;
-  mapSel = { b: mapSel.b, n: +g.dataset.n };
+  mapSel = { b: mapSel.b, n: +g.dataset.n, dc: '' };
   renderMap();
   const again = $('mapBlk').querySelector('.tc.sel'); if (again) again.focus({ preventScroll: true });
+  if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
+}
+function mapPickDc(g) {
+  if (!g) return;
+  mapSel = { b: mapSel.b, n: 0, dc: mapSel.dc === g.dataset.dc ? '' : g.dataset.dc }; // повторный клик снимает выбор
+  renderMap();
   if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
 }
 function mapBack() { if (!mapZoom) return; mapZoom = false; renderMap(); mapSeeSel(); }
 function mapPick(g) {
   if (!g) return;
-  mapSel = { b: +g.dataset.n, n: 0 };
+  mapSel = { b: +g.dataset.n, n: 0, dc: '' };
   renderMap();
   const again = $('mapSvg').querySelector('.mb.sel'); if (again) again.focus({ preventScroll: true });
   if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
@@ -2310,7 +2493,7 @@ $('btnJournal').onclick = () => { closeMap(); closeScada(); window.scrollTo({ to
 window.addEventListener('resize', markSection);
 $('mapClose').onclick = closeMap;
 $('mapBack').onclick = mapBack;
-$('mapBlk').addEventListener('click', e => mapPickTrk(e.target.closest('.tc')));
+$('mapBlk').addEventListener('click', e => { const d = e.target.closest('.dcm'); if (d) mapPickDc(d); else mapPickTrk(e.target.closest('.tc')); });
 $('mapBlk').addEventListener('keydown', e => {
   const g = e.target.closest('.tc');
   if (!g) return;

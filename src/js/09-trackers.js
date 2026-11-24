@@ -1,7 +1,7 @@
 /* ---------- Поиск трекера ---------- */
 /* Данные станции лежат в приватном репозитории (map/trackers.json) и держатся только в памяти вкладки:
    «Заблокировать» и отключение GitHub их стирают. В браузере и в публичном репозитории их нет. */
-const TRK_FILE = 'map/trackers.json', TRK_FIXES = 'map/corrections.json';
+const TRK_FILE = 'map/trackers.json', TRK_FIXES = 'map/corrections.json', DC_FILE = 'map/dc.json';
 let mapLayout = null, mapSel = null, mapErr = '', mapLoading = null, mapZoom = false;
 let trkData = null, trkErr = '', trkLoading = null, trkItems = [], trkActive = -1, trkSel = null;
 const nfmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -30,6 +30,39 @@ function trkBuild(d, fx) {
   const fixes = fx && Array.isArray(fx.items) ? fx.items.filter(i => i && Number.isInteger(i.block) && i.status !== 'rejected') : [];
   return { blocks, total, fixes };
 }
+/* DC-ящики (комбайнер-боксы, 汇流箱) из map/dc.json: место ящика на сетке блока и, где на чертеже подписаны стринги, его трекеры.
+   Файл могут менять все, у кого есть токен, поэтому в дело идут только проверенные числа и номера вида «07». */
+function dcBuild(d, td) {
+  const out = new Map(), int = v => Number.isInteger(v) && v >= 0;
+  if (!d || d.app !== 'scada-map-dc' || !Array.isArray(d.blocks)) return out;
+  for (const b of d.blocks) {
+    if (!b || !int(b.n) || !td.blocks.has(b.n) || !Array.isArray(b.boxes)) continue;
+    const boxes = new Map(), owner = new Map();
+    for (const x of b.boxes) {
+      if (!x || typeof x.id !== 'string' || !/^\d{2}$/.test(x.id) || !Array.isArray(x.cell) || x.cell.length < 2 || !int(x.cell[0]) || !int(x.cell[1])) continue;
+      const trs = Array.isArray(x.trackers) ? x.trackers.filter(int) : [];
+      boxes.set(x.id, { id: x.id, cell: [x.cell[0], x.cell[1]], near: int(x.near) ? x.near : 0, trackers: trs });
+      for (const t of trs) owner.set(t, x.id);
+    }
+    if (boxes.size) out.set(b.n, { exact: b.source === 'подписи', boxes, owner });
+  }
+  return out;
+}
+const dcRanges = a => { // [1,2,3,7,9,10] → «1–3, 7, 9–10»
+  const s = [...a].sort((x, y) => x - y), out = [];
+  for (let i = 0; i < s.length; i++) { let j = i; while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++; out.push(i === j ? '' + s[i] : s[i] + '–' + s[j]); i = j; }
+  return out.join(', ');
+};
+/* Запрос DC-ящика: «13.07», «дс 13 07», «бокс 13-07», «13.07.05» (стринг). Без слова понимаем только запись через точку. */
+function dcParse(q) {
+  const s = String(q || '').toLowerCase().replace(/ё/g, 'е').trim();
+  const word = /(^|[^a-zа-я])(dc|дс|дисбокс|бокс|ящик|комбайнер)/.test(s) || s.includes('汇流箱');
+  const m = s.match(/(\d{1,2})\s*[.\s/-]\s*(\d{1,2})(?:\s*[.-]\s*(\d{1,2}))?/);
+  if (!m) return null;
+  const dot = /^[^\d]*\d{1,2}\.\d{2}(\.\d{1,2})?[^\d]*$/.test(s);
+  if (!word && !dot) return null;
+  return { b: +m[1], id: String(+m[2]).padStart(2, '0'), s: m[3] ? String(+m[3]).padStart(2, '0') : '', only: word || !!m[3] };
+}
 function trkLoad() {
   if (trkData) return Promise.resolve(true);
   if (!ghReady()) { renderTrk(); return Promise.resolve(false); }
@@ -40,8 +73,11 @@ function trkLoad() {
       const d = await trkFile(TRK_FILE, false);
       let fx = null;
       try { fx = await trkFile(TRK_FIXES, true); } catch (e) { fx = null; } // список поправок не обязателен
+      let dc = null;
+      try { dc = await trkFile(DC_FILE, true); } catch (e) { dc = null; } // DC-ящики тоже необязательны
       if (!ghToken) return false; // пока грузили, GitHub заблокировали: данные не оставляем
       trkData = trkBuild(d, fx);
+      trkData.dc = dcBuild(dc, trkData);
       return true;
     } catch (e) { trkData = null; trkErr = (e && e.message) || 'неизвестная ошибка'; return false; }
     finally { trkLoading = null; renderTrk(); renderGh(); }
@@ -84,6 +120,17 @@ function trkParse(q) {
 }
 function trkHits(n) { return [...trkData.blocks.values()].filter(x => x.nums.has(n)).map(x => x.n); }
 function trkResolve(q) {
+  const dq = trkData && trkData.dc && trkData.dc.size ? dcParse(q) : null;
+  let dcIt = null;
+  if (dq) {
+    const D = trkData.dc.get(dq.b), box = D && D.boxes.get(dq.id);
+    dcIt = box ? { k: 'dc', b: dq.b, id: dq.id, n: box.near, s: dq.s } : trkData.blocks.has(dq.b) ? { k: 'nodc', b: dq.b, id: dq.id, has: !!D } : null;
+    if (dq.only) return dcIt ? [dcIt] : [];
+  }
+  const res = trkResolveTrk(q);
+  return dcIt ? [dcIt, ...res] : res;
+}
+function trkResolveTrk(q) {
   const p = trkParse(q);
   if (!p || !trkData) return [];
   const B = trkData.blocks, out = [], tops = () => { const ks = [...B.keys()]; return Math.min(...ks) + '–' + Math.max(...ks); };
@@ -100,17 +147,29 @@ function trkResolve(q) {
   if (p.tr != null) byTracker(p.tr);
   return out;
 }
-const trkSelectable = it => it && (it.k === 'trk' || it.k === 'block');
-const trkLabel = it => it.k === 'block' ? 'Блок ' + it.b : 'Блок ' + it.b + ' · трекер ' + it.n;
+const trkSelectable = it => it && (it.k === 'trk' || it.k === 'block' || it.k === 'dc');
+const trkLabel = it => it.k === 'block' ? 'Блок ' + it.b : it.k === 'dc' ? 'Блок ' + it.b + ' · DC-ящик ' + it.id : 'Блок ' + it.b + ' · трекер ' + it.n;
 function trkNear(b, r, c) {
   const at = (rr, cc) => b.pos.get(rr + ',' + cc);
   const side = d => { for (let k = 1; k <= 3; k++) { const v = at(r, c + d * k); if (v != null) return v; } };
   return { 'слева': side(-1), 'справа': side(1), 'выше': at(r - 1, c), 'ниже': at(r + 1, c) };
 }
 const trkNumOf = s => { const m = /TRK0*(\d+)/i.exec(String(s || '')); return m ? +m[1] : null; };
+function dcCardHTML(it, inMap) {
+  const b = trkData && trkData.blocks.get(it.b), D = trkData && trkData.dc && trkData.dc.get(it.b), x = D && D.boxes.get(it.id);
+  if (!b || !x) return '';
+  const rows = [`<dt>Где</dt><dd>${x.near ? 'у трекера ' + x.near + ', ' : ''}ряд ${x.cell[0]}, колонка ${x.cell[1]}${D.exact ? '' : ' (±1 трекер)'}</dd>`];
+  if (x.trackers.length) rows.push(`<dt>Трекеры ящика</dt><dd>${x.trackers.length}: ${esc(dcRanges(x.trackers))}</dd>`);
+  if (it.s) rows.push(`<dt>Стринг</dt><dd>${esc(b.n + '.' + x.id + '.' + it.s)}</dd>`);
+  const foot = '<p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' : 'По чертежу постоянного тока без подписей стрингов: место примерное, список трекеров неизвестен.') + '</p>';
+  const acts = inMap ? '' : `<div class="trk-acts"><button type="button" class="ghost" data-act="map" data-b="${b.n}" data-dc="${esc(x.id)}">Показать на схеме</button></div>`;
+  return `<h4>${esc('Блок ' + b.n + ' · DC-ящик ' + x.id)}<small>${esc(b.n + '.' + x.id)}</small></h4><dl>${rows.join('')}</dl>${foot}${acts}`;
+}
 function trkCardHTML(it, inMap) {
+  if (it && it.k === 'dc') return dcCardHTML(it, inMap);
   const b = trkData && trkData.blocks.get(it.b);
   if (!b) return '';
+  const D = trkData.dc && trkData.dc.get(b.n);
   const phase = b.phase === 1 ? '1-я очередь' : b.phase === 2 ? '2-я очередь' : '';
   const fixLine = f => `<p class="trk-warn">Замечание к таблице (не подтверждено): ${esc(f.found)} → ${esc(f.proposed)}</p>`;
   const zones = `внешних ${b.outer}, внутренних ${b.inner}, глубинных ${b.deep}` + (b.half ? `, полукомплектов ${b.half}` : '');
@@ -122,6 +181,7 @@ function trkCardHTML(it, inMap) {
     rows.push(`<dt>Трекеров</dt><dd>${b.nums.size}${b.range ? ' (номера ' + esc(b.range) + ')' : ''}</dd>`);
     rows.push(`<dt>На схеме</dt><dd>${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок</dd>`);
     rows.push(`<dt>Зоны ветра</dt><dd>${zones}</dd>`);
+    if (trkData.dc && trkData.dc.size) rows.push(`<dt>DC-ящики</dt><dd>${D ? D.boxes.size + (D.exact ? '' : ' (места примерные)') : 'ещё не размечены'}</dd>`);
     warn = trkData.fixes.filter(f => f.block === b.n).map(fixLine).join('');
   } else {
     head = `Блок ${b.n} · трекер ${it.n}`; loc = `Блок ${b.n}, трекер ${it.n}`;
@@ -132,6 +192,7 @@ function trkCardHTML(it, inMap) {
       rows.push(`<dt>В блоке</dt><dd>ряд ${pos[0]}, колонка ${pos[1]} (всего ${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок)</dd>`);
       const near = Object.entries(trkNear(b, pos[0], pos[1])).filter(([, v]) => v != null).map(([k, v]) => k + ' ' + v).join(', ');
       if (near) rows.push(`<dt>Рядом</dt><dd>${esc(near)}</dd>`);
+      if (D && D.owner.has(it.n)) rows.push(`<dt>DC-ящик</dt><dd>${esc(b.n + '.' + D.owner.get(it.n))}</dd>`);
       rows.push(`<dt>Зоны ветра блока</dt><dd>${zones}</dd>`);
     } else {
       rows.length = 0;
@@ -164,6 +225,8 @@ function trkRowsHTML(items, active) {
       const b = trkData.blocks.get(it.b), pos = b.nums.get(it.n);
       return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · трекер ${it.n}</b><small>${pos ? 'ряд ' + pos[0] + ', колонка ' + pos[1] : 'нет в таблице'}</small></div>`;
     }
+    if (it.k === 'dc') return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · DC-ящик ${esc(it.id)}</b><small>${it.s ? esc('стринг ' + it.s) + (it.n ? ', ' : '') : ''}${it.n ? 'у трекера ' + it.n : ''}</small></div>`;
+    if (it.k === 'nodc') return `<div class="opt muted" role="option" aria-disabled="true">${esc(it.has ? `В блоке ${it.b} нет DC-ящика ${it.id}` : `DC-ящики блока ${it.b} ещё не размечены`)}</div>`;
     const t = it.k === 'more' ? `Трекер ${it.n} есть ещё в блоках: ${it.c}. Добавь номер блока`
       : it.k === 'none' ? `Трекера ${it.n} нет ни в одном блоке` : it.k === 'nob' ? `Блока ${it.b} нет (блоки ${it.r})` : 'Не понял. Пример: 13-87 или блок 13 трекер 87';
     return `<div class="opt muted" role="option" aria-disabled="true">${esc(t)}</div>`;
@@ -211,7 +274,7 @@ $('trkList').addEventListener('click', e => { const o = e.target.closest('[data-
 document.addEventListener('click', e => {
   const a = e.target.closest('#trkCard [data-act], #trkNote [data-act], #mapCard [data-act], #mapMsg [data-act]');
   if (!a) return;
-  if (a.dataset.act === 'map') openMap(+a.dataset.b, +a.dataset.n || 0, !!a.dataset.n);
+  if (a.dataset.act === 'map') openMap(+a.dataset.b, +a.dataset.n || 0, !!(a.dataset.n || a.dataset.dc), a.dataset.dc || '');
   else if (a.dataset.act === 'zoom') { mapZoom = true; renderMap(); mapSeeSel(); }
   else if (a.dataset.act === 'fill') { closeMap(); $('fLoc').value = a.dataset.loc; $('fLoc').dispatchEvent(new Event('input', { bubbles: true })); toast('Подставлено в «Место»: ' + a.dataset.loc); $('fLoc').focus(); }
   else if (a.dataset.act === 'unlock') ghUnlock();

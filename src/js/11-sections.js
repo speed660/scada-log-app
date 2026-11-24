@@ -15,7 +15,7 @@ $('btnJournal').onclick = () => { closeMap(); closeScada(); window.scrollTo({ to
 window.addEventListener('resize', markSection);
 $('mapClose').onclick = closeMap;
 $('mapBack').onclick = mapBack;
-$('mapBlk').addEventListener('click', e => mapPickTrk(e.target.closest('.tc')));
+$('mapBlk').addEventListener('click', e => { const d = e.target.closest('.dcm'); if (d) mapPickDc(d); else mapPickTrk(e.target.closest('.tc')); });
 $('mapBlk').addEventListener('keydown', e => {
   const g = e.target.closest('.tc');
   if (!g) return;
