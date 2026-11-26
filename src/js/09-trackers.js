@@ -2,7 +2,7 @@
 /* Данные станции лежат в приватном репозитории (map/trackers.json) и держатся только в памяти вкладки:
    «Заблокировать» и отключение GitHub их стирают. В браузере и в публичном репозитории их нет. */
 const TRK_FILE = 'map/trackers.json', TRK_FIXES = 'map/corrections.json', DC_FILE = 'map/dc.json';
-let mapLayout = null, mapSel = null, mapErr = '', mapLoading = null, mapZoom = false;
+let mapLayout = null, mapSel = null, mapErr = '', mapLoading = null, mapZoom = false, mapDc = false;
 let trkData = null, trkErr = '', trkLoading = null, trkItems = [], trkActive = -1, trkSel = null;
 const nfmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 async function trkFile(path, optional) {
@@ -87,7 +87,7 @@ function trkLoad() {
 }
 function trkClear() {
   trkData = null; trkErr = ''; trkSel = null; trkItems = [];
-  mapLayout = null; mapSel = null; mapErr = ''; mapZoom = false; closeMap();
+  mapLayout = null; mapSel = null; mapErr = ''; mapZoom = false; mapDc = false; closeMap();
   if ($('fTrk')) { $('fTrk').value = ''; closeTrkList(); renderTrk(); }
 }
 /* Разбор запроса. Понимает «13-87», «13 87», «13/87», «блок 13 трекер 87», «трекер 87 блок 13», «BLK13-TRK087», «б13 т87», «13б 87т».

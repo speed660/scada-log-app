@@ -1,4 +1,4 @@
-"""DC-ящики на сетке блока, их поиск и масштаб схемы.
+"""DC-ящики: слой на схеме поля, сетка блока, поиск и масштаб схемы.
 Данные выдуманные: tests/fixtures/map-sample.json, map-field-sample.json и dc-sample.json; настоящих данных станции здесь нет."""
 from playwright.sync_api import sync_playwright
 from common import *
@@ -85,7 +85,12 @@ with sync_playwright() as p:
     pg.fill('#mapFind', '1.02'); pg.wait_for_timeout(200)
     items = pg.inner_text('#mapFindList')
     check('B: «1.02» — сначала DC-ящик, потом трекер', items.find('DC-ящик 02') >= 0 and items.find('трекер 2') > items.find('DC-ящик 02'), items)
-    pg.press('#mapFind', 'Enter'); pg.wait_for_selector('#mapBlk:not([hidden])', timeout=5000)
+    pg.press('#mapFind', 'Enter'); pg.wait_for_selector('#mapSvg .dp.sel', timeout=5000)
+    check('B: поиск ящика приближает схему поля к нему', vb()[2] < base()[2] * 0.5 and pg.inner_text('#mapTitle') == 'Схема поля', (vb(), base()))
+    check('B: слой DC включён, найденный ящик выбран', pg.get_attribute('#mapDcBtn', 'aria-pressed') == 'true' and pg.evaluate("document.querySelector('#mapSvg .dp.sel').dataset.dc") == '02')
+    check('B: у ящика на схеме поля видны номера', pg.evaluate("getComputedStyle(document.querySelector('#mapSvg .dt')).display") == 'block')
+    check('B: карточка ящика на схеме поля', 'DC-ящик 02' in pg.inner_text('#mapCard') and 'Открыть блок' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
+    pg.click('#mapCard [data-act="zoom"]'); pg.wait_for_selector('#mapBlk:not([hidden])', timeout=5000)
     check('B: открыта сетка блока 1', pg.inner_text('#mapTitle') == 'Блок 1')
     check('B: на сетке три DC-ящика, мусорные записи отброшены', pg.locator('#mapBlk .dcm').count() == 3 and pg.evaluate("!document.getElementById('pwn')"), pg.locator('#mapBlk .dcm').count())
     check('B: ящик 02 выбран', pg.evaluate("document.querySelector('#mapBlk .dcm.sel').dataset.dc") == '02')
@@ -107,8 +112,8 @@ with sync_playwright() as p:
     pg.fill('#mapFind', 'дс 2 01'); pg.wait_for_timeout(200)
     items = pg.inner_text('#mapFindList')
     check('C: «дс 2 01» — только DC-ящик', 'DC-ящик 01' in items and pg.locator('#mapFindList .opt').count() == 1, items)
-    pg.press('#mapFind', 'Enter'); pg.wait_for_selector('#mapBlk .dcm.sel', timeout=5000)
-    check('C: метка примерного ящика пунктиром', pg.evaluate("document.querySelector('#mapBlk .dcm.sel').classList.contains('approx')"))
+    pg.press('#mapFind', 'Enter'); pg.wait_for_selector('#mapSvg .dp.sel', timeout=5000)
+    check('C: точка примерного ящика бледная', pg.evaluate("document.querySelector('#mapSvg .dp.sel').classList.contains('approx')"))
     card = pg.inner_text('#mapCard')
     check('C: в карточке сказано, что место примерное', '±1 трекер' in card and 'примерное' in card, card)
     pg.fill('#mapFind', 'дс 1 05'); pg.wait_for_timeout(200)
@@ -118,9 +123,39 @@ with sync_playwright() as p:
     pg.fill('#mapFind', '')
 
     # D. карточка блока на схеме поля
-    pg.click('#mapBack'); pg.wait_for_selector('#mapSvg:not([hidden])', timeout=5000)
     pg.locator('#mapSvg .mb[data-n="1"]').dispatch_event('click'); pg.wait_for_timeout(150)
     check('D: в карточке блока число DC-ящиков', 'DC-ящики' in pg.inner_text('#mapCard') and '3' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
+
+    # E. слой DC-ящиков на схеме поля
+    pg.click('#mapFit'); pg.wait_for_timeout(100)
+    check('E: кнопка слоя видна и включена', pg.is_visible('#mapDcBtn') and pg.get_attribute('#mapDcBtn', 'aria-pressed') == 'true')
+    pg.click('#mapDcBtn')
+    check('E: выключили слой — точек нет, легенда скрыта', pg.locator('#mapSvg .dp').count() == 0 and not pg.is_visible('#mapDcLeg') and pg.get_attribute('#mapDcBtn', 'aria-pressed') == 'false')
+    pg.click('#mapDcBtn')
+    check('E: включили — 4 точки (мусор и чужие блоки отброшены)', pg.locator('#mapSvg .dp').count() == 4, pg.locator('#mapSvg .dp').count())
+    check('E: легенда слоя видна', pg.is_visible('#mapDcLeg'))
+    d1 = pg.get_attribute('#mapSvg .dp[data-n="1"][data-dc="01"] .dpt', 'd')
+    check('E: точка стоит на месте своего трекера (блок 1, ящик 01)', d1 == 'M12.5 32.5h.01', d1)
+    check('E: примерный ящик (блок 2) бледнее', pg.evaluate("document.querySelector('#mapSvg .dp[data-n=\"2\"]').classList.contains('approx')"))
+    check('E: целиком — без номеров, точки не перехватывают нажатия',
+          pg.evaluate("getComputedStyle(document.querySelector('#mapSvg .dt')).display") == 'none' and pg.evaluate("getComputedStyle(document.querySelector('#mapSvg .dh')).pointerEvents") == 'none')
+    pos = pg.evaluate("(() => { const r = document.querySelector('#mapSvg .dp[data-n=\"1\"][data-dc=\"02\"] .dpt').getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return [!!e.closest('.dp'), !!e.closest('.mb')]; })()")
+    check('E: нажатие на точку при общем виде попадает в блок', pos == [False, True], pos)
+    for _ in range(4): pg.click('#mapZoomIn')
+    check('E: при приближении появляются номера и точки нажимаются',
+          pg.evaluate("getComputedStyle(document.querySelector('#mapSvg .dt')).display") == 'block' and pg.evaluate("getComputedStyle(document.querySelector('#mapSvg .dh')).pointerEvents") == 'stroke')
+    fs = pg.evaluate("document.querySelector('#mapSvg .dt').getBoundingClientRect().height")
+    check('E: подпись ящика на экране не крупнее ~14 px', 0 < fs <= 18, fs)
+    near = pg.evaluate("""(() => { const g = document.querySelector('#mapSvg .dp[data-n="1"][data-dc="02"]'), a = g.querySelector('.dpt').getBoundingClientRect(), t = g.querySelector('.dt').getBoundingClientRect(); return Math.hypot(t.x - (a.x + a.width / 2), t.y + t.height / 2 - (a.y + a.height / 2)); })()""")
+    check('E: подпись стоит рядом со своей точкой (не дальше ~30 px)', near < 30, near)
+    pg.locator('#mapSvg .dp[data-n="1"][data-dc="03"]').dispatch_event('click'); pg.wait_for_timeout(150)
+    check('E: клик по точке открывает карточку ящика', 'DC-ящик 03' in pg.inner_text('#mapCard') and pg.locator('#mapSvg .dp.sel').count() == 1, pg.inner_text('#mapCard'))
+    pg.locator('#mapSvg .dp[data-n="1"][data-dc="03"]').dispatch_event('click'); pg.wait_for_timeout(150)
+    check('E: повторный клик снимает выбор', pg.locator('#mapSvg .dp.sel').count() == 0)
+    pg.evaluate("trkData.dc.delete(2); renderMap()"); pg.wait_for_timeout(100)
+    check('E: блок без данных DC заштрихован и подписан', pg.locator('#mapSvg .hz').count() == 1 and 'нет DC' in pg.inner_text('#mapLegend') + pg.evaluate("document.querySelector('#mapSvg .nd').textContent"), pg.locator('#mapSvg .hz').count())
+    check('E: легенда объясняет штриховку', pg.is_visible('#mapDcLeg2'))
+    pg.evaluate("trkData.dc.set(2, { exact: false, boxes: new Map(), owner: new Map() }); renderMap()")
 
     check('нет ошибок в консоли', not errs, errs[:3])
     b.close()

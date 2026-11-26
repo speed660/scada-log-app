@@ -31,6 +31,6 @@ $('mapBlk').addEventListener('keydown', e => {
     if (r < 1 || c < 1 || r > b.rows + 1 || c > b.cols + 1) return;
   }
 });
-$('mapSvg').addEventListener('click', e => mapPick(e.target.closest('.mb')));
+$('mapSvg').addEventListener('click', e => { const d = e.target.closest('.dp'); if (d) mapPickDcField(d); else mapPick(e.target.closest('.mb')); });
 $('mapSvg').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); mapPick(e.target.closest('.mb')); } });
 

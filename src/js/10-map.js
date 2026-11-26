@@ -101,6 +101,7 @@ function pzApply(svg) {
   const cy = Math.min(Math.max(v.cy == null ? b[1] + b[3] / 2 : v.cy, b[1] + h / 2), b[1] + b[3] - h / 2);
   PZ.views[svg.id] = { s, cx, cy };
   svg.setAttribute('viewBox', [cx - w / 2, cy - h / 2, w, h].map(x => +x.toFixed(2)).join(' '));
+  svg.classList.toggle('zdc', s >= 3); // с такого приближения у DC-ящиков показываем номера
   svg.style.setProperty('--u', pzUnit(svg).toFixed(4)); // единиц схемы на пиксель экрана: по нему подписи держат размер на экране
   if (svg === pzSvg()) { $('mapZoomIn').disabled = s >= PZ_MAX - 0.01; $('mapZoomOut').disabled = $('mapFit').disabled = s <= 1.01; }
 }
@@ -170,13 +171,39 @@ $('mapView').addEventListener('keydown', e => {
 function mapSeeSel() { // найденный трекер на схеме поля приближаем, иначе держим выбранный блок в кадре
   if (mapZoom || !mapSel || !mapLayout || !trkData) return;
   const svg = $('mapSvg'), g = mapGeo().blocks.get(mapSel.b); if (!g || !pzBase(svg)) return;
-  const ys = mapLayout.ys, tg = mapSel.n && g.at.get(mapSel.n);
-  if (tg) pzFocus(svg, tg[1] + 0.5, (tg[0] + 0.5) * ys, 4);
+  const ys = mapLayout.ys, tg = mapSel.n && g.at.get(mapSel.n), dp = mapDc && mapSel.dc ? dcSpot(mapSel.b, g, mapSel.dc) : null;
+  if (dp) pzFocus(svg, dp[1] + 0.5, (dp[0] + 0.5) * ys, 6);
+  else if (tg) pzFocus(svg, tg[1] + 0.5, (tg[0] + 0.5) * ys, 4);
   else if (pzView(svg).s > 1) pzFocus(svg, g.lab[0], g.lab[1] * ys, 1);
+}
+/* Слой DC-ящиков на схеме поля: точка на месте трекера, около которого стоит ящик (то же место, что на сетке блока). */
+function dcSpot(n, g, id) {
+  const D = trkData.dc && trkData.dc.get(n), x = D && D.boxes.get(id); if (!x) return null;
+  const b = trkData.blocks.get(n), num = b && b.pos.get(x.cell[0] + ',' + x.cell[1]);
+  let p = num != null ? g.at.get(num) : null;
+  if (!p && x.near) p = g.at.get(x.near);
+  const fb = mapLayout.blocks.get(n);
+  if (!p && fb && !fb.cells) p = [x.cell[0] + fb.dr, x.cell[1] + fb.dc];
+  return p || null;
+}
+function mapDcLayer(G) {
+  const ys = mapLayout.ys, f = v => +v.toFixed(2); let h = '<g class="dl">';
+  for (const [n, g] of G.blocks) {
+    const D = trkData.dc && trkData.dc.get(n); if (!D) continue;
+    const at = new Map();
+    for (const x of D.boxes.values()) { const p = dcSpot(n, g, x.id); if (!p) continue; const k = p[0] + ',' + p[1]; if (!at.has(k)) at.set(k, []); at.get(k).push([x, p]); }
+    for (const list of at.values()) list.forEach(([x, p], i) => { // несколько ящиков у одного трекера раздвигаем по высоте клетки
+      const cx = f(p[1] + 0.5), cy = f((p[0] + 0.5) * ys + (i - (list.length - 1) / 2) * 2.2), on = mapSel && mapSel.b === n && mapSel.dc === x.id;
+      h += `<g class="dp${on ? ' sel' : ''}${D.exact ? '' : ' approx'}" data-n="${n}" data-dc="${esc(x.id)}" role="button" aria-label="DC-ящик ${n}.${esc(x.id)}">` +
+        `<path class="dh" d="M${cx} ${cy}h.01"/><path class="dpt" d="M${cx} ${cy}h.01"/><text class="dt" x="${cx}" y="${cy}">${esc(x.id)}</text></g>`;
+    });
+  }
+  return h + '</g>';
 }
 function openMap(b, n, zoom, dc) {
   $('scadaView').hidden = true; closeSheet();
   mapSel = b ? { b, n: n || 0, dc: dc || '' } : null;
+  if (dc && trkData && trkData.dc && trkData.dc.size) mapDc = true; // найденный ящик показываем вместе со слоем
   if (!b) delete PZ.views.mapSvg; // кнопка «Карта» без цели — всё поле целиком
   mapZoom = !!(b && zoom);
   $('mapView').hidden = false; markSection();
@@ -205,6 +232,8 @@ function renderMap() {
   $('mapZoom').hidden = !(zoomOK || (mapLayout && trkData && ghToken));
   $('mapBack').hidden = !zoomOK;
   svg.toggleAttribute('hidden', !ready); $('mapLegend').hidden = !ready; // у SVG нет свойства hidden
+  const hasDc = !!(ready && trkData.dc && trkData.dc.size), dcOn = hasDc && mapDc;
+  $('mapDcBtn').hidden = !hasDc; $('mapDcBtn').setAttribute('aria-pressed', String(dcOn)); $('mapDcLeg').hidden = !dcOn; $('mapDcLeg2').hidden = !(dcOn && [...mapLayout.blocks.keys()].some(n => trkData.blocks.has(n) && !(trkData.dc && trkData.dc.get(n))));
   if (ready) $('mapUnsure').hidden = !mapLayout.unsure.size;
   blkSvg.toggleAttribute('hidden', !zoomOK); $('mapLegend2').hidden = !zoomOK;
   if (zoomOK) { svg.innerHTML = ''; renderMapBlock(blkSvg, card); return; }
@@ -213,22 +242,25 @@ function renderMap() {
   const L = mapLayout, ys = L.ys, G = mapGeo();
   const x0 = G.c0 - 3, y0 = (G.r0 - 1) * ys, x1 = Math.max(G.c1 + 2, ...L.ents.map(e => e.c + 62)), y1 = (G.r1 + 2) * ys;
   pzSetBase(svg, [x0, y0, x1 - x0, y1 - y0]);
-  let h = '<g class="rd">' + L.roads.map(([r, a, b]) => `<rect x="${a}" y="${r * ys}" width="${b - a + 1}" height="${ys}"/>`).join('') + '</g>';
+  let h = (dcOn ? '<defs><pattern id="mapHatch" width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="2.4"/></pattern></defs>' : '') + '<g class="rd">' + L.roads.map(([r, a, b]) => `<rect x="${a}" y="${r * ys}" width="${b - a + 1}" height="${ys}"/>`).join('') + '</g>';
   for (const [n, g] of G.blocks) {
     const info = trkData.blocks.get(n), cls = info.phase === 1 ? 'ph1' : 'ph2';
-    const sel = mapSel && mapSel.b === n;
+    const sel = mapSel && mapSel.b === n, noDc = dcOn && !(trkData.dc && trkData.dc.get(n));
     h += `<g class="mb ${cls}${L.unsure.has(n) ? ' uncertain' : ''}${sel ? ' sel' : ''}" data-n="${n}" tabindex="0" role="button" aria-pressed="${sel ? 'true' : 'false'}" aria-label="Блок ${n}, канал ${esc(info.freq)}">` +
       `<path class="fl" d="${g.fill}"/><path class="ei" d="${g.inner}"/><path class="ed" d="${g.edge}"/>` +
-      `<text class="num" x="${g.lab[0]}" y="${g.lab[1] * ys - 1}">${n}</text><text class="fr" x="${g.lab[0]}" y="${g.lab[1] * ys + 6}">${esc(info.freq)}</text></g>`;
+      `<text class="num" x="${g.lab[0]}" y="${g.lab[1] * ys - 1}">${n}</text><text class="fr" x="${g.lab[0]}" y="${g.lab[1] * ys + 6}">${esc(info.freq)}</text>` +
+      (noDc ? `<path class="hz" d="${g.fill}" fill="url(#mapHatch)"/><text class="nd" x="${g.lab[0]}" y="${g.lab[1] * ys + 10.5}">нет DC</text>` : '') + '</g>';
   }
   for (const [n, g] of G.blocks) if (g.box) h += `<rect class="bx" x="${g.box[1] + 0.5 - 1.1}" y="${(g.box[0] + 0.5) * ys - 1.1}" width="2.2" height="2.2"/>`;
   for (const e of L.ents) h += `<g class="en"><path d="M${e.c - 1} ${(e.r + 0.5) * ys - 3} l-7 3 l7 3 z"/><text x="${e.c + 1.5}" y="${(e.r + 0.5) * ys + 1.6}">${esc(e.name)}</text></g>`;
+  if (dcOn) h += mapDcLayer(G);
   const tg = mapSel && mapSel.n && G.blocks.has(mapSel.b) && G.blocks.get(mapSel.b).at.get(mapSel.n);
   if (tg) h += `<g class="pin"><circle cx="${tg[1] + 0.5}" cy="${(tg[0] + 0.5) * ys}" r="4.2"/></g>`;
   svg.innerHTML = h;
   if (mapSel && trkData.blocks.has(mapSel.b)) {
-    const bl = { uncertain: L.unsure.has(mapSel.b) };
-    card.innerHTML = trkCardHTML(mapSel.n ? { k: 'trk', b: mapSel.b, n: mapSel.n } : { k: 'block', b: mapSel.b }, true) +
+    const bl = { uncertain: L.unsure.has(mapSel.b) }, dD = dcOn && mapSel.dc && trkData.dc.get(mapSel.b), dX = dD && dD.boxes.get(mapSel.dc);
+    if (dX) card.innerHTML = dcCardHTML({ k: 'dc', b: mapSel.b, id: dX.id }, true) + (bl.uncertain ? '<p class="trk-warn">Положение этого блока на схеме не подтверждено.</p>' : '') + '<div class="trk-acts"><button type="button" class="ghost" data-act="zoom">Открыть блок</button></div>';
+    else card.innerHTML = trkCardHTML(mapSel.n ? { k: 'trk', b: mapSel.b, n: mapSel.n } : { k: 'block', b: mapSel.b }, true) +
       (bl && bl.uncertain ? '<p class="trk-warn">Положение этого блока на схеме не подтверждено.</p>' : '') +
       `<div class="trk-acts"><button type="button" class="ghost" data-act="zoom">Открыть блок</button></div>`;
     card.hidden = false;
@@ -278,7 +310,7 @@ function mapFindChoose(i) {
   const it = mapFindItems[i];
   if (!trkSelectable(it)) return;
   $('mapFind').value = ''; mapFindItems = []; $('mapFindList').hidden = true;
-  openMap(it.b, it.k === 'trk' ? it.n : 0, it.k === 'trk' || it.k === 'dc', it.k === 'dc' ? it.id : '');
+  openMap(it.b, it.k === 'trk' ? it.n : 0, it.k === 'trk', it.k === 'dc' ? it.id : '');
 }
 $('mapFind').addEventListener('input', mapFindDraw);
 $('mapFind').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const i = mapFindItems.findIndex(trkSelectable); if (i >= 0) mapFindChoose(i); } else if (e.key === 'Escape' && $('mapFind').value) { e.stopPropagation(); $('mapFind').value = ''; mapFindDraw(); } });
@@ -297,6 +329,14 @@ function mapPickDc(g) {
   renderMap();
   if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
 }
+function mapPickDcField(g) {
+  if (!g || !mapDc) return;
+  const b = +g.dataset.n, same = mapSel && mapSel.b === b && mapSel.dc === g.dataset.dc;
+  mapSel = { b, n: 0, dc: same ? '' : g.dataset.dc }; // повторный клик снимает выбор ящика
+  renderMap();
+  if (window.matchMedia('(max-width:860px)').matches) $('mapCard').scrollIntoView({ block: 'nearest' });
+}
+$('mapDcBtn').onclick = () => { mapDc = !mapDc; if (!mapDc && mapSel) mapSel.dc = ''; renderMap(); };
 function mapBack() { if (!mapZoom) return; mapZoom = false; renderMap(); mapSeeSel(); }
 function mapPick(g) {
   if (!g) return;
