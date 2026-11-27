@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ruMQ3WdJkTkX1KvgDWM4TPwjmgpyzBvXrLhtx2aVHDY='; style-src 'unsafe-inline'; img-src data: blob:; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DjOxIM5pTNrrbd/ML6MHXvHfmq+g3Ve/VZBCMv4doLc='; style-src 'unsafe-inline'; img-src data: blob:; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
 <title>Журнал диспетчера</title>
 <style>
 :root{
@@ -1937,6 +1937,8 @@ function trkBuild(d, fx) {
   return { blocks, total, fixes };
 }
 /* DC-ящики (комбайнер-боксы, 汇流箱) из map/dc.json: место ящика на сетке блока и, где на чертеже подписаны стринги, его трекеры.
+   Граница ящиков бывает посреди TCU (один ряд в один ящик, второй в соседний), поэтому у TCU может быть два ящика.
+   approx у ящика — место ±1 TCU (в ряду полукомплекты, по чертежу не различить), даже если блок собран по подписям.
    Файл могут менять все, у кого есть токен, поэтому в дело идут только проверенные числа и номера вида «07». */
 function dcBuild(d, td) {
   const out = new Map(), int = v => Number.isInteger(v) && v >= 0;
@@ -1947,8 +1949,8 @@ function dcBuild(d, td) {
     for (const x of b.boxes) {
       if (!x || typeof x.id !== 'string' || !/^\d{2}$/.test(x.id) || !Array.isArray(x.cell) || x.cell.length < 2 || !int(x.cell[0]) || !int(x.cell[1])) continue;
       const trs = Array.isArray(x.trackers) ? x.trackers.filter(int) : [];
-      boxes.set(x.id, { id: x.id, cell: [x.cell[0], x.cell[1]], near: int(x.near) ? x.near : 0, trackers: trs });
-      for (const t of trs) owner.set(t, x.id);
+      boxes.set(x.id, { id: x.id, cell: [x.cell[0], x.cell[1]], near: int(x.near) ? x.near : 0, trackers: trs, approx: x.approx === true || b.source !== 'подписи' });
+      for (const t of trs) { const l = owner.get(t) || []; if (!l.includes(x.id)) l.push(x.id); owner.set(t, l); }
     }
     if (boxes.size) out.set(b.n, { exact: b.source === 'подписи', boxes, owner });
   }
@@ -2068,11 +2070,11 @@ function dcCardHTML(it, inMap) {
   const b = trkData && trkData.blocks.get(it.b), D = trkData && trkData.dc && trkData.dc.get(it.b), x = D && D.boxes.get(it.id);
   if (!b || !x) return '';
   const at = `ряд ${x.cell[0]}, колонка ${x.cell[1]}`;
-  const rows = [`<dt>Где</dt><dd>${x.near ? `рядом с TCU ${x.near} (${at})` : at}${D.exact ? '' : ', ±1 TCU'}</dd>`];
+  const rows = [`<dt>Где</dt><dd>${x.near ? `рядом с TCU ${x.near} (${at})` : at}${x.approx ? ', ±1 TCU' : ''}</dd>`];
   if (it.s) rows.push(`<dt>Стринг</dt><dd>${esc(b.n + '.' + x.id + '.' + it.s)}</dd>`);
   // строка длинная: отдельным абзацем, чтобы на телефоне не сжимать колонку значений
   const own = x.trackers.length ? `<p class="trk-note2">Его стринги лежат на рядах TCU: ${esc(dcRanges(x.trackers))} (${x.trackers.length} TCU)</p>` : '';
-  const foot = own + '<p class="trk-note2">Ящик собирает ток от стрингов, TCU поворачивает панели, это разные системы.</p><p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' : 'По чертежу постоянного тока без подписей стрингов: место примерное, на каких рядах его стринги, неизвестно.') + '</p>';
+  const foot = own + '<p class="trk-note2">Ящик собирает ток от стрингов, TCU поворачивает панели, это разные системы.</p><p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' + (x.approx ? ' Место примерное: рядом полукомплекты (TCU на один ряд), по чертежу не различить, какой из соседних TCU.' : '') : 'По чертежу постоянного тока без подписей стрингов: место примерное, на каких рядах его стринги, неизвестно.') + '</p>';
   const acts = inMap ? '' : `<div class="trk-acts"><button type="button" class="ghost" data-act="map" data-b="${b.n}" data-dc="${esc(x.id)}">Показать на схеме</button></div>`;
   return `<h4>${esc('DC-ящик ' + b.n + '.' + x.id)}<small>Блок ${b.n}</small></h4><dl>${rows.join('')}</dl>${foot}${acts}`;
 }
@@ -2103,7 +2105,7 @@ function trkCardHTML(it, inMap) {
       rows.push(`<dt>В блоке</dt><dd>ряд ${pos[0]}, колонка ${pos[1]} (всего ${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок)</dd>`);
       const near = Object.entries(trkNear(b, pos[0], pos[1])).filter(([, v]) => v != null).map(([k, v]) => k + ' ' + v).join(', ');
       if (near) rows.push(`<dt>Рядом</dt><dd>${esc(near)}</dd>`);
-      if (D && D.owner.has(it.n)) rows.push(`<dt>Стринги идут в</dt><dd>DC-ящик ${esc(b.n + '.' + D.owner.get(it.n))}</dd>`);
+      if (D && D.owner.has(it.n)) { const ids = D.owner.get(it.n); rows.push(`<dt>Стринги идут в</dt><dd>${ids.length > 1 ? 'DC-ящики' : 'DC-ящик'} ${esc(ids.map(id => b.n + '.' + id).join(' и '))}</dd>`); }
       rows.push(`<dt>Зоны ветра блока</dt><dd>${zones}</dd>`);
     } else {
       rows.length = 0;
@@ -2388,7 +2390,7 @@ function mapDcLayer(G) {
     for (const x of D.boxes.values()) { const p = dcSpot(n, g, x.id); if (!p) continue; const k = p[0] + ',' + p[1]; if (!at.has(k)) at.set(k, []); at.get(k).push([x, p]); }
     for (const list of at.values()) list.forEach(([x, p], i) => { // несколько ящиков у одного трекера раздвигаем по высоте клетки
       const cx = f(p[1] + 0.5), cy = f((p[0] + 0.5) * ys + (i - (list.length - 1) / 2) * 2.2), on = mapSel && mapSel.b === n && mapSel.dc === x.id;
-      h += `<g class="dp${on ? ' sel' : ''}${D.exact ? '' : ' approx'}" data-n="${n}" data-dc="${esc(x.id)}" role="button" aria-label="DC-ящик ${n}.${esc(x.id)}">` +
+      h += `<g class="dp${on ? ' sel' : ''}${x.approx ? ' approx' : ''}" data-n="${n}" data-dc="${esc(x.id)}" role="button" aria-label="DC-ящик ${n}.${esc(x.id)}">` +
         `<path class="dh" d="M${cx} ${cy}h.01"/><path class="dpt" d="M${cx} ${cy}h.01"/><text class="dt" x="${cx}" y="${cy}">${esc(x.id)}</text></g>`;
     });
   }
@@ -2485,7 +2487,7 @@ function renderMapBlock(svg, card) {
     for (const x of D.boxes.values()) {
       const k = x.cell.join(','), i = used.get(k) || 0; used.set(k, i + 1);
       const cx = MB_L + x.cell[1] * MB_W - 1, cy = MB_T + (x.cell[0] - 1) * MB_H + 1 + i * 8.5, on = dsel && dsel.id === x.id;
-      h += `<g class="dcm${on ? ' sel' : ''}${D.exact ? '' : ' approx'}" data-dc="${esc(x.id)}" tabindex="-1" role="button" aria-pressed="${!!on}" aria-label="DC-ящик ${esc(b.n + '.' + x.id)}">` +
+      h += `<g class="dcm${on ? ' sel' : ''}${x.approx ? ' approx' : ''}" data-dc="${esc(x.id)}" tabindex="-1" role="button" aria-pressed="${!!on}" aria-label="DC-ящик ${esc(b.n + '.' + x.id)}">` +
         `<rect x="${cx - 12}" y="${cy}" width="12" height="7.5" rx="1.5"/><text x="${cx - 6}" y="${cy + 5.6}">${esc(x.id)}</text></g>`;
     }
   }

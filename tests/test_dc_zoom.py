@@ -103,8 +103,9 @@ with sync_playwright() as p:
     check('B: повторный клик по ящику снимает выбор', pg.locator('#mapBlk .dcm.sel').count() == 0 and pg.locator('#mapBlk .tc.dco').count() == 0)
     pg.click('#mapBlk .dcm[data-dc="03"]'); pg.wait_for_timeout(150)
     check('B: клик по другому ящику выбирает его', 'DC-ящик 1.03' in pg.inner_text('#mapCard'))
+    check('B: ящик 03 в точном блоке, но место ±1 TCU (полукомплекты)', '±1 TCU' in pg.inner_text('#mapCard') and 'полукомплекты' in pg.inner_text('#mapCard') and pg.evaluate("document.querySelector('#mapBlk .dcm[data-dc=\"03\"]').classList.contains('approx')") and not pg.evaluate("document.querySelector('#mapBlk .dcm[data-dc=\"02\"]').classList.contains('approx')"), pg.inner_text('#mapCard'))
     pg.click('#mapBlk .tc[data-n="6"]'); pg.wait_for_timeout(150)
-    check('B: в карточке TCU виден его DC-ящик', 'Стринги идут в' in pg.inner_text('#mapCard') and 'DC-ящик 1.01' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
+    check('B: в карточке TCU виден его DC-ящик', 'Стринги идут в' in pg.inner_text('#mapCard') and 'DC-ящики 1.01 и 1.03' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
     pg.click('#mapZoomIn'); w1 = vb('#mapBlk')[2]
     check('B: сетку блока тоже можно приближать', w1 < base('#mapBlk')[2] * 0.7, w1)
 

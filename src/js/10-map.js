@@ -194,7 +194,7 @@ function mapDcLayer(G) {
     for (const x of D.boxes.values()) { const p = dcSpot(n, g, x.id); if (!p) continue; const k = p[0] + ',' + p[1]; if (!at.has(k)) at.set(k, []); at.get(k).push([x, p]); }
     for (const list of at.values()) list.forEach(([x, p], i) => { // несколько ящиков у одного трекера раздвигаем по высоте клетки
       const cx = f(p[1] + 0.5), cy = f((p[0] + 0.5) * ys + (i - (list.length - 1) / 2) * 2.2), on = mapSel && mapSel.b === n && mapSel.dc === x.id;
-      h += `<g class="dp${on ? ' sel' : ''}${D.exact ? '' : ' approx'}" data-n="${n}" data-dc="${esc(x.id)}" role="button" aria-label="DC-ящик ${n}.${esc(x.id)}">` +
+      h += `<g class="dp${on ? ' sel' : ''}${x.approx ? ' approx' : ''}" data-n="${n}" data-dc="${esc(x.id)}" role="button" aria-label="DC-ящик ${n}.${esc(x.id)}">` +
         `<path class="dh" d="M${cx} ${cy}h.01"/><path class="dpt" d="M${cx} ${cy}h.01"/><text class="dt" x="${cx}" y="${cy}">${esc(x.id)}</text></g>`;
     });
   }
@@ -291,7 +291,7 @@ function renderMapBlock(svg, card) {
     for (const x of D.boxes.values()) {
       const k = x.cell.join(','), i = used.get(k) || 0; used.set(k, i + 1);
       const cx = MB_L + x.cell[1] * MB_W - 1, cy = MB_T + (x.cell[0] - 1) * MB_H + 1 + i * 8.5, on = dsel && dsel.id === x.id;
-      h += `<g class="dcm${on ? ' sel' : ''}${D.exact ? '' : ' approx'}" data-dc="${esc(x.id)}" tabindex="-1" role="button" aria-pressed="${!!on}" aria-label="DC-ящик ${esc(b.n + '.' + x.id)}">` +
+      h += `<g class="dcm${on ? ' sel' : ''}${x.approx ? ' approx' : ''}" data-dc="${esc(x.id)}" tabindex="-1" role="button" aria-pressed="${!!on}" aria-label="DC-ящик ${esc(b.n + '.' + x.id)}">` +
         `<rect x="${cx - 12}" y="${cy}" width="12" height="7.5" rx="1.5"/><text x="${cx - 6}" y="${cy + 5.6}">${esc(x.id)}</text></g>`;
     }
   }

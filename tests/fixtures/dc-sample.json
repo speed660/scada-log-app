@@ -2,7 +2,7 @@
 {"n":1,"source":"подписи","boxes":[
  {"id":"01","cell":[1,2],"near":2,"trackers":[1,2,5,6]},
  {"id":"02","cell":[2,4],"near":8,"trackers":[3,4,7,8,11,12]},
- {"id":"03","cell":[3,1],"near":9,"trackers":[9,10]},
+ {"id":"03","cell":[3,1],"near":9,"trackers":[6,9,10],"approx":true},
  {"id":"<b id=\"pwn\">x</b>","cell":[1,1]},
  {"id":"04","cell":["<i>",1]}],"issues":[]},
 {"n":2,"source":"вектор","boxes":[{"id":"01","cell":[1,1],"near":1}],"issues":[]},

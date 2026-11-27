@@ -31,6 +31,8 @@ function trkBuild(d, fx) {
   return { blocks, total, fixes };
 }
 /* DC-ящики (комбайнер-боксы, 汇流箱) из map/dc.json: место ящика на сетке блока и, где на чертеже подписаны стринги, его трекеры.
+   Граница ящиков бывает посреди TCU (один ряд в один ящик, второй в соседний), поэтому у TCU может быть два ящика.
+   approx у ящика — место ±1 TCU (в ряду полукомплекты, по чертежу не различить), даже если блок собран по подписям.
    Файл могут менять все, у кого есть токен, поэтому в дело идут только проверенные числа и номера вида «07». */
 function dcBuild(d, td) {
   const out = new Map(), int = v => Number.isInteger(v) && v >= 0;
@@ -41,8 +43,8 @@ function dcBuild(d, td) {
     for (const x of b.boxes) {
       if (!x || typeof x.id !== 'string' || !/^\d{2}$/.test(x.id) || !Array.isArray(x.cell) || x.cell.length < 2 || !int(x.cell[0]) || !int(x.cell[1])) continue;
       const trs = Array.isArray(x.trackers) ? x.trackers.filter(int) : [];
-      boxes.set(x.id, { id: x.id, cell: [x.cell[0], x.cell[1]], near: int(x.near) ? x.near : 0, trackers: trs });
-      for (const t of trs) owner.set(t, x.id);
+      boxes.set(x.id, { id: x.id, cell: [x.cell[0], x.cell[1]], near: int(x.near) ? x.near : 0, trackers: trs, approx: x.approx === true || b.source !== 'подписи' });
+      for (const t of trs) { const l = owner.get(t) || []; if (!l.includes(x.id)) l.push(x.id); owner.set(t, l); }
     }
     if (boxes.size) out.set(b.n, { exact: b.source === 'подписи', boxes, owner });
   }
@@ -162,11 +164,11 @@ function dcCardHTML(it, inMap) {
   const b = trkData && trkData.blocks.get(it.b), D = trkData && trkData.dc && trkData.dc.get(it.b), x = D && D.boxes.get(it.id);
   if (!b || !x) return '';
   const at = `ряд ${x.cell[0]}, колонка ${x.cell[1]}`;
-  const rows = [`<dt>Где</dt><dd>${x.near ? `рядом с TCU ${x.near} (${at})` : at}${D.exact ? '' : ', ±1 TCU'}</dd>`];
+  const rows = [`<dt>Где</dt><dd>${x.near ? `рядом с TCU ${x.near} (${at})` : at}${x.approx ? ', ±1 TCU' : ''}</dd>`];
   if (it.s) rows.push(`<dt>Стринг</dt><dd>${esc(b.n + '.' + x.id + '.' + it.s)}</dd>`);
   // строка длинная: отдельным абзацем, чтобы на телефоне не сжимать колонку значений
   const own = x.trackers.length ? `<p class="trk-note2">Его стринги лежат на рядах TCU: ${esc(dcRanges(x.trackers))} (${x.trackers.length} TCU)</p>` : '';
-  const foot = own + '<p class="trk-note2">Ящик собирает ток от стрингов, TCU поворачивает панели, это разные системы.</p><p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' : 'По чертежу постоянного тока без подписей стрингов: место примерное, на каких рядах его стринги, неизвестно.') + '</p>';
+  const foot = own + '<p class="trk-note2">Ящик собирает ток от стрингов, TCU поворачивает панели, это разные системы.</p><p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' + (x.approx ? ' Место примерное: рядом полукомплекты (TCU на один ряд), по чертежу не различить, какой из соседних TCU.' : '') : 'По чертежу постоянного тока без подписей стрингов: место примерное, на каких рядах его стринги, неизвестно.') + '</p>';
   const acts = inMap ? '' : `<div class="trk-acts"><button type="button" class="ghost" data-act="map" data-b="${b.n}" data-dc="${esc(x.id)}">Показать на схеме</button></div>`;
   return `<h4>${esc('DC-ящик ' + b.n + '.' + x.id)}<small>Блок ${b.n}</small></h4><dl>${rows.join('')}</dl>${foot}${acts}`;
 }
@@ -197,7 +199,7 @@ function trkCardHTML(it, inMap) {
       rows.push(`<dt>В блоке</dt><dd>ряд ${pos[0]}, колонка ${pos[1]} (всего ${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок)</dd>`);
       const near = Object.entries(trkNear(b, pos[0], pos[1])).filter(([, v]) => v != null).map(([k, v]) => k + ' ' + v).join(', ');
       if (near) rows.push(`<dt>Рядом</dt><dd>${esc(near)}</dd>`);
-      if (D && D.owner.has(it.n)) rows.push(`<dt>Стринги идут в</dt><dd>DC-ящик ${esc(b.n + '.' + D.owner.get(it.n))}</dd>`);
+      if (D && D.owner.has(it.n)) { const ids = D.owner.get(it.n); rows.push(`<dt>Стринги идут в</dt><dd>${ids.length > 1 ? 'DC-ящики' : 'DC-ящик'} ${esc(ids.map(id => b.n + '.' + id).join(' и '))}</dd>`); }
       rows.push(`<dt>Зоны ветра блока</dt><dd>${zones}</dd>`);
     } else {
       rows.length = 0;
