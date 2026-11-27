@@ -100,7 +100,7 @@ with sync_playwright() as p:
     pg.fill('#mapFind', 'ерунда')
     check('C: непонятный запрос — подсказка, не ошибка', pg.is_visible('#mapFindList') and 'Не понял' in pg.inner_text('#mapFindList'), pg.inner_text('#mapFindList'))
     pg.fill('#mapFind', '1-6')
-    check('C: найден трекер 6 блока 1', pg.is_visible('#mapFindList') and 'Блок 1 · трекер 6' in pg.inner_text('#mapFindList'), pg.inner_text('#mapFindList'))
+    check('C: найден трекер 6 блока 1', pg.is_visible('#mapFindList') and 'Блок 1 · TCU 6' in pg.inner_text('#mapFindList'), pg.inner_text('#mapFindList'))
     pg.press('#mapFind', 'Enter')
     check('C: открыта сетка блока 1, трекер 6 выбран', pg.is_visible('#mapBlk') and pg.evaluate("document.querySelector('#mapBlk .tc.sel').dataset.n") == '6' and pg.inner_text('#mapTitle') == 'Блок 1')
     check('C: поле поиска очищено, список закрыт', pg.input_value('#mapFind') == '' and not pg.is_visible('#mapFindList'))

@@ -281,7 +281,7 @@ function renderMapBlock(svg, card) {
   const first = sel && at ? sel : (b.nums.size ? Math.min(...b.nums.keys()) : 0);
   for (const [n, [r, c]] of b.nums) {
     const x = MB_L + (c - 1) * MB_W, y = MB_T + (r - 1) * MB_H, on = n === sel;
-    h += `<g class="tc${on ? ' sel' : nb.has(n) ? ' nb' : mine.has(n) ? ' dco' : ''}" data-n="${n}" data-r="${r}" data-c="${c}" tabindex="${n === first ? 0 : -1}" role="button" aria-pressed="${on}" aria-label="Трекер ${n}, ряд ${r}, колонка ${c}">` +
+    h += `<g class="tc${on ? ' sel' : nb.has(n) ? ' nb' : mine.has(n) ? ' dco' : ''}" data-n="${n}" data-r="${r}" data-c="${c}" tabindex="${n === first ? 0 : -1}" role="button" aria-pressed="${on}" aria-label="TCU ${n}, ряд ${r}, колонка ${c}">` +
       `<rect x="${x + 0.6}" y="${y + 0.6}" width="${MB_W - 1.2}" height="${MB_H - 1.2}" rx="2"/><text x="${x + MB_W / 2}" y="${y + MB_H / 2 + 2.6}">${n}</text></g>`;
   }
   const bx = b.box;

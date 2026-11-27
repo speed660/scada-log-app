@@ -111,6 +111,7 @@ input[type=checkbox]{width:20px;height:20px;min-height:0;padding:0;accent-color:
 .trk-card dd{margin:0;overflow-wrap:anywhere}
 .trk-card .trk-warn{margin:8px 0 0;font-size:13px;color:var(--sun-ink)}
 .trk-card .trk-foot{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.trk-card .trk-note2{margin:8px 0 0;font-size:13px}
 .trk-card .trk-acts{margin-top:8px}
 .trk-note{font-size:12px;color:var(--muted);margin:6px 0 0}
 .mapview{position:fixed;inset:var(--toph,0px) 0 0 0;z-index:35;background:var(--paper);display:flex;flex-direction:column;overflow:auto}

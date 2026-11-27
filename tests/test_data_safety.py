@@ -78,7 +78,7 @@ with sync_playwright() as p:
     check('зоны ветра: вместо HTML нули', 'внешних 0, внутренних 0, глубинных 0' in card, card)
     pg.fill('#mapFind', '1-6'); pg.press('#mapFind', 'Enter'); pg.wait_for_timeout(400)
     card = pg.inner_text('#mapCard')
-    check('карточка трекера открылась', 'трекер 6' in card, card[:80])
+    check('карточка трекера открылась', 'TCU 6' in card, card[:80])
     check('канал связи показан как текст', '<img' in pg.inner_text('#mapCard') or 'onerror' in card, card[:200])
     pg.wait_for_timeout(300)
     check('подложенный код не выполнился', pg.evaluate('window.__pwn') is None)

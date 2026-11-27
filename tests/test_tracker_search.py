@@ -64,12 +64,13 @@ with sync_playwright() as p:
     # A. разбор запроса
     cases = {'13-87': (13, 87), '13 87': (13, 87), '13/87': (13, 87), '13.87': (13, 87), 'блок 13 трекер 87': (13, 87), 'Блок 13, трекер 87': (13, 87),
              'трекер 87 блок 13': (13, 87), 'BLK13-TRK087': (13, 87), 'blk13 trk87': (13, 87), 'б13 т87': (13, 87), '13б 87т': (13, 87),
-             'блок 5': (5, None), 'бл.5': (5, None), 'трекер 87': (None, 87), 'trk087': (None, 87)}
+             'блок 5': (5, None), 'бл.5': (5, None), 'трекер 87': (None, 87), 'trk087': (None, 87),
+             'tcu 13-87': (13, 87), 'трекер 13-87': (13, 87), 'TCU 13/87': (13, 87), 'TCU 87 блок 13': (13, 87), 'блок 13 tcu 87': (13, 87), 'тсу 87': (None, 87)}
     for q, want in cases.items():
         r = pg.evaluate('q => trkParse(q)', q)
         check('A: «%s»' % q, r and (r.get('block'), r.get('tr')) == want, r)
     check('A: одно число неоднозначно', pg.evaluate("trkParse('45')") == {'any': 45})
-    check('A: TCU-045 читается как одно число', pg.evaluate("trkParse('tcu-045')") == {'any': 45})
+    check('A: TCU-045 — номер TCU без блока', pg.evaluate("trkParse('tcu-045')") == {'block': None, 'tr': 45}, pg.evaluate("trkParse('tcu-045')"))
     for q in ['', 'abc', '1 2 3', '   ']:
         check('A: «%s» не разобрано' % q, pg.evaluate('q => trkParse(q)', q) is None)
 
@@ -92,13 +93,13 @@ with sync_playwright() as p:
     if pg.is_visible('#fab'): pg.click('#fab')
     pg.wait_for_selector('#fTrk:not([disabled])', timeout=3000)
     check('C: поле включено', not pg.is_disabled('#fTrk'))
-    check('C: в заметке число блоков', 'Данные станции: 2 блока, 19 трекеров' in pg.inner_text('#trkNote').replace(' ', ' '), pg.inner_text('#trkNote'))
+    check('C: в заметке число блоков', 'Данные станции: 2 блока, 19 TCU' in pg.inner_text('#trkNote').replace(' ', ' '), pg.inner_text('#trkNote'))
 
     # D. однозначный запрос сразу показывает карточку
     pg.fill('#fTrk', '1-6')
     card = pg.inner_text('#trkCard')
     check('D: карточка видна', pg.is_visible('#trkCard'))
-    check('D: заголовок', 'Блок 1 · трекер 6' in card, card)
+    check('D: заголовок', 'Блок 1 · TCU 6' in card, card)
     check('D: положение', 'ряд 2, колонка 2' in card, card)
     check('D: канал связи', '4242' in card, card)
     check('D: соседи', 'слева 5' in card and 'справа 7' in card and 'выше 2' in card and 'ниже 10' in card, card)
@@ -128,10 +129,10 @@ with sync_playwright() as p:
     check('G: непонятный запрос', 'Не понял' in pg.inner_text('#trkList'))
     pg.fill('#fTrk', '1')
     lst = pg.inner_text('#trkList')
-    check('G: число 1 даёт блок и трекеры', 'Блок 1' in lst and 'Блок 1 · трекер 1' in lst and 'Блок 2 · трекер 1' in lst, lst)
+    check('G: число 1 даёт блок и трекеры', 'Блок 1' in lst and 'Блок 1 · TCU 1' in lst and 'Блок 2 · TCU 1' in lst, lst)
     check('G: карточки ещё нет', not pg.is_visible('#trkCard'))
     pg.fill('#fTrk', '3')
-    check('G: трекер 3 есть в двух блоках, блока 3 нет', 'Блок 3' not in pg.inner_text('#trkList').replace('Блок 1 · трекер 3', '').replace('Блок 2 · трекер 3', ''), pg.inner_text('#trkList'))
+    check('G: трекер 3 есть в двух блоках, блока 3 нет', 'Блок 3' not in pg.inner_text('#trkList').replace('Блок 1 · TCU 3', '').replace('Блок 2 · TCU 3', ''), pg.inner_text('#trkList'))
     pg.fill('#fTrk', '77')
     check('G: трекера 77 нигде нет', 'нет ни в одном блоке' in pg.inner_text('#trkList'), pg.inner_text('#trkList'))
 
@@ -145,7 +146,7 @@ with sync_playwright() as p:
 
     # I. «Подставить в Место»
     pg.fill('#fTrk', '1-6'); pg.click('#trkCard [data-act=fill]')
-    check('I: место подставлено', pg.input_value('#fLoc') == 'Блок 1, трекер 6', pg.input_value('#fLoc'))
+    check('I: место подставлено', pg.input_value('#fLoc') == 'Блок 1, TCU 6', pg.input_value('#fLoc'))
     check('I: данные записи не тронуты', pg.input_value('#fDev') == '')
 
     # J. данные станции не попадают в браузерное хранилище и в страницу

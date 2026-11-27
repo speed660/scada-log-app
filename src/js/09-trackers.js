@@ -1,4 +1,4 @@
-/* ---------- Поиск трекера ---------- */
+/* ---------- Поиск TCU (в данных и коде «трекер»: одна клетка сетки = один TCU, привод на 2 ряда панелей) ---------- */
 /* Данные станции лежат в приватном репозитории (map/trackers.json) и держатся только в памяти вкладки:
    «Заблокировать» и отключение GitHub их стирают. В браузере и в публичном репозитории их нет. */
 const TRK_FILE = 'map/trackers.json', TRK_FIXES = 'map/corrections.json', DC_FILE = 'map/dc.json';
@@ -90,9 +90,9 @@ function trkClear() {
   mapLayout = null; mapSel = null; mapErr = ''; mapZoom = false; mapDc = false; closeMap();
   if ($('fTrk')) { $('fTrk').value = ''; closeTrkList(); renderTrk(); }
 }
-/* Разбор запроса. Понимает «13-87», «13 87», «13/87», «блок 13 трекер 87», «трекер 87 блок 13», «BLK13-TRK087», «б13 т87», «13б 87т».
+/* Разбор запроса. Понимает «13-87», «13 87», «13/87», «блок 13 трекер 87», «блок 13 tcu 87», «трекер 87 блок 13», «BLK13-TRK087», «б13 т87», «13б 87т».
    Одно число без слов неоднозначно: это может быть и блок, и номер трекера. */
-const TRK_B = ['(?:блока|блок|block|blk|бл)', '(?:б|b)'], TRK_T = ['(?:трекера|трекер|tracker|trk|тр)', '(?:т|t)'];
+const TRK_B = ['(?:блока|блок|block|blk|бл)', '(?:б|b)'], TRK_T = ['(?:трекера|трекер|tracker|trk|tcu|тсу|тцу|тр)', '(?:т|t)'];
 function trkAssoc(s, w) {
   const tries = [
     ['(?:^|[^a-zа-я])' + w[0] + '\\.?\\s*[-_#№:]*\\s*(\\d+)', 0], ['(\\d+)\\s*[-_]?\\s*' + w[0] + '(?![a-zа-я])', 1],
@@ -108,6 +108,9 @@ function trkParse(q) {
   const s = String(q || '').toLowerCase().replace(/ё/g, 'е');
   const all = [...s.matchAll(/\d+/g)].map(m => ({ n: +m[0], at: m.index }));
   if (!all.length || all.length > 2) return null;
+  // «трекер 13-87», «tcu 13-87»: слово перед парой «блок-номер» — только приставка, как у «13-87»
+  const pre = /^\s*(?:трекера|трекер|tracker|trk|tcu|тсу|тцу)\.?\s*[#№:]?\s*(\d+)\s*[-/.]\s*(\d+)\s*$/.exec(s);
+  if (pre) return { block: +pre[1], tr: +pre[2] };
   const b = trkAssoc(s, TRK_B), t = trkAssoc(s, TRK_T);
   if (b && t && b.at === t.at) return null;
   const rest = all.filter(x => !(b && x.at === b.at) && !(t && x.at === t.at));
@@ -148,7 +151,7 @@ function trkResolveTrk(q) {
   return out;
 }
 const trkSelectable = it => it && (it.k === 'trk' || it.k === 'block' || it.k === 'dc');
-const trkLabel = it => it.k === 'block' ? 'Блок ' + it.b : it.k === 'dc' ? 'Блок ' + it.b + ' · DC-ящик ' + it.id : 'Блок ' + it.b + ' · трекер ' + it.n;
+const trkLabel = it => it.k === 'block' ? 'Блок ' + it.b : it.k === 'dc' ? 'Блок ' + it.b + ' · DC-ящик ' + it.id : 'Блок ' + it.b + ' · TCU ' + it.n;
 function trkNear(b, r, c) {
   const at = (rr, cc) => b.pos.get(rr + ',' + cc);
   const side = d => { for (let k = 1; k <= 3; k++) { const v = at(r, c + d * k); if (v != null) return v; } };
@@ -158,12 +161,14 @@ const trkNumOf = s => { const m = /TRK0*(\d+)/i.exec(String(s || '')); return m 
 function dcCardHTML(it, inMap) {
   const b = trkData && trkData.blocks.get(it.b), D = trkData && trkData.dc && trkData.dc.get(it.b), x = D && D.boxes.get(it.id);
   if (!b || !x) return '';
-  const rows = [`<dt>Где</dt><dd>${x.near ? 'у трекера ' + x.near + ', ' : ''}ряд ${x.cell[0]}, колонка ${x.cell[1]}${D.exact ? '' : ' (±1 трекер)'}</dd>`];
-  if (x.trackers.length) rows.push(`<dt>Трекеры ящика</dt><dd>${x.trackers.length}: ${esc(dcRanges(x.trackers))}</dd>`);
+  const at = `ряд ${x.cell[0]}, колонка ${x.cell[1]}`;
+  const rows = [`<dt>Где</dt><dd>${x.near ? `рядом с TCU ${x.near} (${at})` : at}${D.exact ? '' : ', ±1 TCU'}</dd>`];
   if (it.s) rows.push(`<dt>Стринг</dt><dd>${esc(b.n + '.' + x.id + '.' + it.s)}</dd>`);
-  const foot = '<p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' : 'По чертежу постоянного тока без подписей стрингов: место примерное, список трекеров неизвестен.') + '</p>';
+  // строка длинная: отдельным абзацем, чтобы на телефоне не сжимать колонку значений
+  const own = x.trackers.length ? `<p class="trk-note2">Его стринги лежат на рядах TCU: ${esc(dcRanges(x.trackers))} (${x.trackers.length} TCU)</p>` : '';
+  const foot = own + '<p class="trk-note2">Ящик собирает ток от стрингов, TCU поворачивает панели, это разные системы.</p><p class="trk-foot">' + (D.exact ? 'По чертежу постоянного тока блока (подписи стрингов).' : 'По чертежу постоянного тока без подписей стрингов: место примерное, на каких рядах его стринги, неизвестно.') + '</p>';
   const acts = inMap ? '' : `<div class="trk-acts"><button type="button" class="ghost" data-act="map" data-b="${b.n}" data-dc="${esc(x.id)}">Показать на схеме</button></div>`;
-  return `<h4>${esc('Блок ' + b.n + ' · DC-ящик ' + x.id)}<small>${esc(b.n + '.' + x.id)}</small></h4><dl>${rows.join('')}</dl>${foot}${acts}`;
+  return `<h4>${esc('DC-ящик ' + b.n + '.' + x.id)}<small>Блок ${b.n}</small></h4><dl>${rows.join('')}</dl>${foot}${acts}`;
 }
 function trkCardHTML(it, inMap) {
   if (it && it.k === 'dc') return dcCardHTML(it, inMap);
@@ -178,13 +183,13 @@ function trkCardHTML(it, inMap) {
   let head, warn = '', acts, loc;
   if (it.k === 'block') {
     head = `Блок ${b.n}`; loc = 'Блок ' + b.n;
-    rows.push(`<dt>Трекеров</dt><dd>${b.nums.size}${b.range ? ' (номера ' + esc(b.range) + ')' : ''}</dd>`);
+    rows.push(`<dt>TCU</dt><dd>${b.nums.size}${b.range ? ' (номера ' + esc(b.range) + ')' : ''}</dd>`);
     rows.push(`<dt>На схеме</dt><dd>${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок</dd>`);
     rows.push(`<dt>Зоны ветра</dt><dd>${zones}</dd>`);
     if (trkData.dc && trkData.dc.size) rows.push(`<dt>DC-ящики</dt><dd>${D ? D.boxes.size + (D.exact ? '' : ' (места примерные)') : 'ещё не размечены'}</dd>`);
     warn = trkData.fixes.filter(f => f.block === b.n).map(fixLine).join('');
   } else {
-    head = `Блок ${b.n} · трекер ${it.n}`; loc = `Блок ${b.n}, трекер ${it.n}`;
+    head = `Блок ${b.n} · TCU ${it.n}`; loc = `Блок ${b.n}, TCU ${it.n}`;
     const pos = b.nums.get(it.n);
     const rel = trkData.fixes.filter(f => f.block === b.n && (trkNumOf(f.found) === it.n || trkNumOf(f.proposed) === it.n));
     warn = rel.map(fixLine).join('');
@@ -192,11 +197,11 @@ function trkCardHTML(it, inMap) {
       rows.push(`<dt>В блоке</dt><dd>ряд ${pos[0]}, колонка ${pos[1]} (всего ${plural(b.rows, 'ряд', 'ряда', 'рядов')}, до ${b.cols} колонок)</dd>`);
       const near = Object.entries(trkNear(b, pos[0], pos[1])).filter(([, v]) => v != null).map(([k, v]) => k + ' ' + v).join(', ');
       if (near) rows.push(`<dt>Рядом</dt><dd>${esc(near)}</dd>`);
-      if (D && D.owner.has(it.n)) rows.push(`<dt>DC-ящик</dt><dd>${esc(b.n + '.' + D.owner.get(it.n))}</dd>`);
+      if (D && D.owner.has(it.n)) rows.push(`<dt>Стринги идут в</dt><dd>DC-ящик ${esc(b.n + '.' + D.owner.get(it.n))}</dd>`);
       rows.push(`<dt>Зоны ветра блока</dt><dd>${zones}</dd>`);
     } else {
       rows.length = 0;
-      rows.push(`<dt>Статус</dt><dd>такого номера нет в таблице блока (трекеров ${b.nums.size}${b.range ? ', номера ' + esc(b.range) : ''})</dd>`, `<dt>Канал связи</dt><dd>${esc(b.freq)}</dd>`);
+      rows.push(`<dt>Статус</dt><dd>такого номера нет в таблице блока (TCU ${b.nums.size}${b.range ? ', номера ' + esc(b.range) : ''})</dd>`, `<dt>Канал связи</dt><dd>${esc(b.freq)}</dd>`);
     }
   }
   acts = `<div class="trk-acts">` + (JOURNAL_ON ? `<button type="button" class="ghost" data-act="fill" data-loc="${esc(loc)}">Подставить в «Место»</button>` : '') +
@@ -208,10 +213,10 @@ function renderTrk() {
   if (!note) return;
   let msg = '', act = '';
   if (!gh.cfg) msg = 'Поиск использует данные станции из приватного репозитория. Подключи GitHub в меню «Данные».';
-  else if (!ghToken) { msg = 'GitHub заблокирован. Разблокируй, чтобы искать трекеры.'; act = 'unlock'; }
+  else if (!ghToken) { msg = 'GitHub заблокирован. Разблокируй, чтобы искать TCU.'; act = 'unlock'; }
   else if (trkLoading) msg = 'Загружаю данные станции…';
   else if (trkErr) { msg = 'Не удалось загрузить данные станции: ' + trkErr + '.'; act = 'retry'; }
-  else if (trkData) msg = 'Данные станции: ' + plural(trkData.blocks.size, 'блок', 'блока', 'блоков') + ', ' + nfmt(trkData.total) + ' трекеров.';
+  else if (trkData) msg = 'Данные станции: ' + plural(trkData.blocks.size, 'блок', 'блока', 'блоков') + ', ' + nfmt(trkData.total) + ' TCU.';
   note.textContent = msg;
   if (act) { note.append(' '); const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'link'; bt.dataset.act = act; bt.textContent = act === 'unlock' ? 'Разблокировать' : 'Повторить'; note.append(bt); }
   inp.disabled = !trkData;
@@ -223,12 +228,12 @@ function trkRowsHTML(items, active) {
     if (it.k === 'block') return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b}</b><small>канал ${esc(trkData.blocks.get(it.b).freq)}</small></div>`;
     if (it.k === 'trk') {
       const b = trkData.blocks.get(it.b), pos = b.nums.get(it.n);
-      return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · трекер ${it.n}</b><small>${pos ? 'ряд ' + pos[0] + ', колонка ' + pos[1] : 'нет в таблице'}</small></div>`;
+      return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · TCU ${it.n}</b><small>${pos ? 'ряд ' + pos[0] + ', колонка ' + pos[1] : 'нет в таблице'}</small></div>`;
     }
-    if (it.k === 'dc') return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · DC-ящик ${esc(it.id)}</b><small>${it.s ? esc('стринг ' + it.s) + (it.n ? ', ' : '') : ''}${it.n ? 'у трекера ' + it.n : ''}</small></div>`;
+    if (it.k === 'dc') return `<div class="opt${i === active ? ' active' : ''}" role="option" data-i="${i}"><b>Блок ${it.b} · DC-ящик ${esc(it.id)}</b><small>${it.s ? esc('стринг ' + it.s) + (it.n ? ', ' : '') : ''}${it.n ? 'рядом с TCU ' + it.n : ''}</small></div>`;
     if (it.k === 'nodc') return `<div class="opt muted" role="option" aria-disabled="true">${esc(it.has ? `В блоке ${it.b} нет DC-ящика ${it.id}` : `DC-ящики блока ${it.b} ещё не размечены`)}</div>`;
-    const t = it.k === 'more' ? `Трекер ${it.n} есть ещё в блоках: ${it.c}. Добавь номер блока`
-      : it.k === 'none' ? `Трекера ${it.n} нет ни в одном блоке` : it.k === 'nob' ? `Блока ${it.b} нет (блоки ${it.r})` : 'Не понял. Пример: 13-87 или блок 13 трекер 87';
+    const t = it.k === 'more' ? `TCU ${it.n} есть ещё в блоках: ${it.c}. Добавь номер блока`
+      : it.k === 'none' ? `TCU ${it.n} нет ни в одном блоке` : it.k === 'nob' ? `Блока ${it.b} нет (блоки ${it.r})` : 'Не понял. Пример: 13-87, блок 13 TCU 87 или трекер 87';
     return `<div class="opt muted" role="option" aria-disabled="true">${esc(t)}</div>`;
   }).join('');
 }

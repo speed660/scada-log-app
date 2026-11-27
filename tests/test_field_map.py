@@ -133,7 +133,7 @@ with sync_playwright() as p:
     check('E: в карточке трекера есть «Показать на схеме»', pg.is_visible('#trkCard [data-act=map]'))
     pg.click('#trkCard [data-act=map]')
     check('E: открыт блок 1, трекер 6 выбран', pg.is_visible('#mapBlk') and pg.evaluate("document.querySelector('#mapBlk .tc.sel').dataset.n") == '6' and pg.inner_text('#mapTitle') == 'Блок 1')
-    check('E: карточка про трекер', 'трекер 6' in pg.inner_text('#mapCard') and 'ряд 2, колонка 2' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
+    check('E: карточка про трекер', 'TCU 6' in pg.inner_text('#mapCard') and 'ряд 2, колонка 2' in pg.inner_text('#mapCard'), pg.inner_text('#mapCard'))
     check('E: в сетке 12 трекеров', pg.locator('#mapBlk .tc').count() == 12)
     check('E: соседи подсвечены (5, 7, 2, 10)', sorted(pg.evaluate("[...document.querySelectorAll('#mapBlk .tc.nb')].map(g => +g.dataset.n)")) == [2, 5, 7, 10])
     check('E: кнопка «Вся схема» видна, поле скрыто', pg.is_visible('#mapBack') and not pg.is_visible('#mapSvg'))
@@ -141,7 +141,7 @@ with sync_playwright() as p:
 
     # E2. выбор другого трекера кликом и стрелками
     pg.click('#mapBlk .tc[data-n="11"]')
-    check('E2: выбран 11', pg.evaluate("document.querySelector('#mapBlk .tc.sel').dataset.n") == '11' and 'трекер 11' in pg.inner_text('#mapCard'))
+    check('E2: выбран 11', pg.evaluate("document.querySelector('#mapBlk .tc.sel').dataset.n") == '11' and 'TCU 11' in pg.inner_text('#mapCard'))
     pg.press('#mapBlk .tc.sel', 'ArrowLeft')
     check('E2: стрелка влево — фокус на 10', pg.evaluate("document.activeElement.dataset.n") == '10')
     pg.press('#mapBlk .tc[data-n="10"]', 'Enter')
